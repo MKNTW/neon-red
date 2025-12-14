@@ -116,9 +116,23 @@ async function safeFetch(url, options = {}) {
         if (error.name === 'AbortError') {
             throw new Error('Превышено время ожидания запроса');
         }
-        if (error instanceof TypeError && error.message.includes('fetch')) {
+        if (error instanceof TypeError) {
+            const errorMsg = error.message || '';
             console.error(`[safeFetch] Network error for ${url}:`, error);
-            throw new Error('Ошибка сети. Проверьте подключение к интернету');
+            console.error(`[safeFetch] Error type: ${error.name}, Message: ${errorMsg}`);
+            
+            // Более детальные сообщения об ошибках сети
+            if (errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch')) {
+                // Это может быть CORS, сервер недоступен, или проблема с SSL
+                let networkErrorMsg = 'Ошибка сети. ';
+                if (url.includes('https://')) {
+                    networkErrorMsg += 'Возможные причины: сервер недоступен, проблема с CORS, или ошибка SSL. ';
+                }
+                networkErrorMsg += `Проверьте подключение к интернету и доступность сервера: ${new URL(url).origin}`;
+                throw new Error(networkErrorMsg);
+            } else if (errorMsg.includes('fetch')) {
+                throw new Error('Ошибка сети. Проверьте подключение к интернету');
+            }
         }
         throw error;
     } finally {
@@ -2491,6 +2505,8 @@ class NeonShop {
                 password: password ? `[${password.length} chars]` : null,
                 fullName
             });
+            console.log('API Base URL:', this.API_BASE_URL);
+            console.log('Full register URL:', `${this.API_BASE_URL}/register`);
             
             const response = await safeFetch(`${this.API_BASE_URL}/register`, {
                 method: 'POST',

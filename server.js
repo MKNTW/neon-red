@@ -190,16 +190,25 @@ app.post('/api/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, saltRounds);
 
         // Первый пользователь - админ (warning: change for prod)
-        const { count, error: countError } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true });
-            
-        if (countError) {
-            console.error('Error counting users:', countError);
-            throw countError;
+        // Проверяем количество пользователей более надежным способом
+        let isAdmin = false;
+        try {
+            const { count, error: countError } = await supabase
+                .from('users')
+                .select('*', { count: 'exact', head: true });
+                
+            if (countError) {
+                console.error('Error counting users:', countError);
+                // Если не удалось посчитать, просто продолжаем (не критично)
+                console.warn('Could not determine if user should be admin, defaulting to false');
+            } else {
+                isAdmin = count === 0 || count === null;
+            }
+        } catch (countErr) {
+            console.error('Exception while counting users:', countErr);
+            // Продолжаем без прав админа, если не удалось определить
+            isAdmin = false;
         }
-            
-        const isAdmin = count === 0;
 
         const { data: user, error } = await supabase
             .from('users')
