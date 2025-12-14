@@ -957,7 +957,6 @@ button:focus-visible {
 .product-image-img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
     transition: transform 0.7s;
     background: #111;
 }
@@ -1113,8 +1112,8 @@ button:focus-visible {
     background: rgba(0, 0, 0, 0.95);
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
-    overflow-y: auto;
-    overflow-x: hidden;
+    #overflow-y: auto;
+    #overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     padding: max(20px, var(--safe-area-inset-top)) 0 max(20px, var(--safe-area-inset-bottom));
     animation: fadeIn 0.3s ease;
@@ -1139,7 +1138,6 @@ button:focus-visible {
     border: 1px solid var(--neon-red);
     box-shadow: 0 0 50px rgba(255, 0, 51, 0.3);
     max-height: calc(100vh - 40px);
-    overflow-y: auto;
     position: relative;
     animation: slideUp 0.4s ease;
 }
@@ -3045,7 +3043,7 @@ input, textarea, [contenteditable] {
     
     /* Улучшенные модальные окна */
     .modal {
-        padding: 10px 0;
+        padding: 0px;
     }
     
     .modal-content {
