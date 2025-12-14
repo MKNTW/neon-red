@@ -126,17 +126,22 @@ app.post('/api/register', async (req, res) => {
         const cleanEmail = email.trim().toLowerCase();
 
         // Проверка существования пользователя (используем параметризованные запросы)
-        const { data: existingUserByUsername } = await supabase
+        const { data: existingUserByUsername, error: usernameError } = await supabase
             .from('users')
             .select('id')
             .eq('username', cleanUsername)
-            .single();
+            .maybeSingle();
             
-        const { data: existingUserByEmail } = await supabase
+        const { data: existingUserByEmail, error: emailError } = await supabase
             .from('users')
             .select('id')
             .eq('email', cleanEmail)
-            .single();
+            .maybeSingle();
+            
+        if (usernameError || emailError) {
+            console.error('Error checking existing users:', usernameError || emailError);
+            throw new Error('Ошибка при проверке существующих пользователей');
+        }
             
         const existingUser = existingUserByUsername || existingUserByEmail;
 
@@ -151,9 +156,14 @@ app.post('/api/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, saltRounds);
 
         // Первый пользователь - админ (warning: change for prod)
-        const { count } = await supabase
+        const { count, error: countError } = await supabase
             .from('users')
-            .select('*', { count: 'exact' });
+            .select('*', { count: 'exact', head: true });
+            
+        if (countError) {
+            console.error('Error counting users:', countError);
+            throw new Error('Ошибка при проверке количества пользователей');
+        }
             
         const isAdmin = count === 0;
 
@@ -196,7 +206,16 @@ app.post('/api/register', async (req, res) => {
 
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: 'Ошибка регистрации' });
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+        });
+        res.status(500).json({ 
+            error: 'Ошибка регистрации',
+            message: error.message || 'Неизвестная ошибка'
+        });
     }
 });
 
