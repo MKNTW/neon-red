@@ -19,7 +19,7 @@ const upload = multer({ storage });
 app.use(cors({
     origin: [
         'https://shop.mkntw.xyz',
-        'https://api-shop.mkntw.xyz',
+        'https://apiforshop.mkntw.xyz',
         'http://localhost:3000',
         'http://localhost:3001',
         'http://127.0.0.1:3000',
@@ -1324,13 +1324,8 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
     }
 });
 
-// Экспорт для Vercel (serverless function)
-module.exports = app;
-
-// Запуск сервера только в локальной среде (не на Vercel)
-if (require.main === module) {
-    app.listen(PORT, () => {
-        console.log(`Сервер запущен на порту ${PORT}`);
-        console.log(`API доступен по адресу: http://localhost:${PORT}/api`);
-    });
-}
+// Запуск сервера
+app.listen(PORT, () => {
+    console.log(`Сервер запущен на порту ${PORT}`);
+    console.log(`API доступен по адресу: http://localhost:${PORT}/api`);
+});

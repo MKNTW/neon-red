@@ -115,12 +115,9 @@ class NeonShop {
         // Автоматическое определение URL для API
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             this.API_BASE_URL = 'http://localhost:3001/api';
-        } else if (window.location.hostname === 'shop.mkntw.xyz' || window.location.hostname.includes('mkntw.xyz')) {
-            // Для продакшена используем api-shop.mkntw.xyz
-            this.API_BASE_URL = 'https://api-shop.mkntw.xyz/api';
         } else {
-            // Fallback на api-shop.mkntw.xyz
-            this.API_BASE_URL = 'https://api-shop.mkntw.xyz/api';
+            // Для продакшена используем apiforshop.mkntw.xyz
+            this.API_BASE_URL = 'https://apiforshop.mkntw.xyz/api';
         }
         
         console.log('API Base URL:', this.API_BASE_URL);
