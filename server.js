@@ -19,7 +19,7 @@ const upload = multer({ storage });
 app.use(cors({
     origin: [
         'https://shop.mkntw.xyz',
-        'https://api-shop.mkntw.xyz',
+        'https://apiforshop.mkntw.xyz',
         'http://localhost:3000',
         'http://localhost:3001',
         'http://127.0.0.1:3000',
