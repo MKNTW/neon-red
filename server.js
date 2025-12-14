@@ -42,7 +42,11 @@ const supabase = createClient(
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Resend клиент
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+if (!RESEND_API_KEY) {
+    console.warn('⚠️  RESEND_API_KEY не установлен. Отправка email не будет работать.');
+}
+const resend = new Resend(RESEND_API_KEY);
 
 // === ФУНКЦИИ ДЛЯ EMAIL ПОДТВЕРЖДЕНИЯ ===
 
@@ -54,7 +58,7 @@ function generateCode() {
 // Отправка кода подтверждения на email
 async function sendVerificationCode(email, code) {
     try {
-        await resend.emails.send({
+        const { data, error } = await resend.emails.send({
             from: 'NEON RED <onboarding@resend.dev>',
             to: email,
             subject: 'Код подтверждения NEON RED',
@@ -81,6 +85,13 @@ async function sendVerificationCode(email, code) {
                 </div>
             `
         });
+
+        if (error) {
+            console.error('Resend API error:', error);
+            throw new Error(error.message || 'Ошибка отправки email через Resend');
+        }
+
+        console.log('Email sent successfully, ID:', data?.id);
         return true;
     } catch (error) {
         console.error('Error sending verification code:', error);

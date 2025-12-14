@@ -2634,6 +2634,7 @@ class NeonShop {
 
     async sendEmailVerificationCode(email) {
         try {
+            showLoadingIndicator();
             const response = await safeFetch(`${this.API_BASE_URL}/send-email-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2641,19 +2642,22 @@ class NeonShop {
             });
 
             const data = await response.json();
+            hideLoadingIndicator();
 
             if (data.success) {
                 this.pendingVerificationEmail = email;
-                this.showToast('Код подтверждения отправлен на почту', 'success');
+                this.showToast('✅ Код подтверждения отправлен на почту', 'success');
             } else {
                 // Не показываем ошибку, если email уже зарегистрирован - это нормально
-                if (!data.error || !data.error.includes('уже зарегистрирован')) {
+                if (!data.error || (!data.error.includes('уже зарегистрирован') && !data.error.includes('Подождите'))) {
                     this.showToast(data.error || data.message || 'Ошибка отправки кода', 'error');
+                } else if (data.error.includes('Подождите')) {
+                    this.showToast(data.message || data.error, 'warning');
                 }
             }
         } catch (error) {
-            // Не показываем ошибку, если это просто проблема с отправкой
-            // Код будет отправлен при регистрации
+            hideLoadingIndicator();
+            // Не показываем критическую ошибку, код будет отправлен при регистрации
             console.log('Email code send error (non-critical):', error.message);
         }
     }
