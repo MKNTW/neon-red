@@ -72,18 +72,29 @@ async function safeFetch(url, options = {}) {
         // Если ответ не OK, пытаемся получить сообщение об ошибке
         if (!response.ok) {
             let errorMessage = `Ошибка ${response.status}`;
+            let errorData = null;
             try {
-                const errorData = await response.json();
+                errorData = await response.json();
                 errorMessage = errorData.error || errorData.message || errorMessage;
             } catch (e) {
                 // Если не удалось распарсить JSON, используем статус
                 if (response.status === 401) errorMessage = 'Требуется авторизация';
                 else if (response.status === 403) errorMessage = 'Доступ запрещен';
                 else if (response.status === 404) errorMessage = `Ресурс не найден: ${url}`;
+                else if (response.status === 400) errorMessage = 'Неверный запрос';
+                else if (response.status === 409) errorMessage = 'Конфликт данных';
+                else if (response.status === 429) errorMessage = 'Слишком много запросов';
                 else if (response.status === 500) errorMessage = 'Ошибка сервера';
             }
+            
+            // Сохраняем данные ошибки для дальнейшей обработки
+            const error = new Error(errorMessage);
+            error.status = response.status;
+            error.data = errorData;
+            error.url = url;
+            
             console.error(`[safeFetch] Error ${response.status} for ${url}:`, errorMessage);
-            throw new Error(errorMessage);
+            throw error;
         }
         
         return response;
@@ -2383,12 +2394,11 @@ class NeonShop {
             
             this.registerData.password = password;
             this.hideFieldError('password-error');
-            // Завершаем регистрацию с паролем
-            await this.completeRegistrationWithPassword();
+            // На шаге 5 не переходим дальше, кнопка сама вызовет completeRegistrationWithPassword
             return;
         }
         
-        // Переход между шагами
+        // Переход между шагами (только для шагов 1-4)
         if (currentStep < 5) {
             this.currentRegisterStep = currentStep + 1;
             this.updateRegisterStepDisplay();
@@ -2410,16 +2420,50 @@ class NeonShop {
     }
 
     async completeRegistrationWithPassword() {
-        const password = this.registerData.password;
+        // Получаем пароль из полей ввода
+        const password = document.getElementById('register-password')?.value;
+        const password2 = document.getElementById('register-password2')?.value;
+        const passwordError = document.getElementById('password-error');
         const fullName = document.getElementById('register-fullname')?.value.trim() || '';
         
+        // Валидация пароля
         if (!password) {
+            if (passwordError) {
+                passwordError.textContent = 'Введите пароль';
+                passwordError.style.display = 'block';
+            }
             this.showToast('Введите пароль', 'error');
             return false;
         }
+        
+        if (password.length < 6) {
+            if (passwordError) {
+                passwordError.textContent = 'Пароль должен быть не менее 6 символов';
+                passwordError.style.display = 'block';
+            }
+            this.showToast('Пароль должен быть не менее 6 символов', 'error');
+            return false;
+        }
+        
+        if (password !== password2) {
+            if (passwordError) {
+                passwordError.textContent = 'Пароли не совпадают';
+                passwordError.style.display = 'block';
+            }
+            this.showToast('Пароли не совпадают', 'error');
+            return false;
+        }
+
+        if (passwordError) {
+            passwordError.textContent = '';
+            passwordError.style.display = 'none';
+        }
 
         if (!this.pendingRegistrationToken || !this.pendingRegistrationUser) {
-            this.showToast('Ошибка: данные регистрации не найдены', 'error');
+            this.showToast('Ошибка: данные регистрации не найдены. Начните регистрацию заново', 'error');
+            // Сбрасываем форму
+            this.setupRegisterSteps();
+            this.updateRegisterStepDisplay();
             return false;
         }
 
@@ -2465,12 +2509,23 @@ class NeonShop {
                 };
                 return true;
             } else {
-                this.showToast('Ошибка завершения регистрации', 'error');
+                this.showToast(data.error || 'Ошибка завершения регистрации', 'error');
                 return false;
             }
         } catch (error) {
             hideLoadingIndicator();
-            this.showToast(error.message, 'error');
+            // Улучшенная обработка ошибок
+            let errorMessage = error.message || 'Ошибка завершения регистрации';
+            
+            // Если токен недействителен, возможно пользователь уже зарегистрирован
+            if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('токен')) {
+                errorMessage = 'Сессия истекла. Пользователь может быть уже зарегистрирован. Попробуйте войти.';
+                this.setupRegisterSteps();
+                this.updateRegisterStepDisplay();
+                showLoginForm();
+            }
+            
+            this.showToast(errorMessage, 'error');
             return false;
         }
     }
@@ -2602,13 +2657,52 @@ class NeonShop {
                 return false;
             }
 
-            const response = await safeFetch(`${this.API_BASE_URL}/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, email, password: 'temp_password_will_be_changed', fullName: null })
-            });
+            showLoadingIndicator();
+            let response, data;
+            
+            try {
+                response = await safeFetch(`${this.API_BASE_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password: 'temp_password_will_be_changed', fullName: null })
+                });
 
-            const data = await response.json();
+                data = await response.json();
+            } catch (fetchError) {
+                hideLoadingIndicator();
+                // Если ошибка сети или сервера, проверяем, не создался ли пользователь
+                if (fetchError.message?.includes('400') || fetchError.message?.includes('уже существует')) {
+                    this.showFieldError('username-error', 'Пользователь с таким именем уже существует');
+                    this.showToast('Пользователь с таким именем уже существует. Попробуйте войти или используйте другое имя', 'error');
+                    this.currentRegisterStep = 1;
+                    this.updateRegisterStepDisplay();
+                    return false;
+                }
+                throw fetchError;
+            }
+            
+            hideLoadingIndicator();
+
+            // Проверяем, не существует ли уже пользователь
+            if (!response.ok) {
+                const errorMsg = data?.error || data?.message || 'Ошибка регистрации';
+                
+                // Если пользователь уже существует
+                if (response.status === 400 || response.status === 409) {
+                    if (errorMsg.includes('уже существует') || errorMsg.includes('занято') || errorMsg.includes('duplicate') || errorMsg.includes('unique')) {
+                        this.showFieldError('username-error', errorMsg);
+                        this.showToast(errorMsg + '. Попробуйте войти или используйте другое имя', 'error');
+                        // Возвращаемся на шаг 1
+                        this.currentRegisterStep = 1;
+                        this.updateRegisterStepDisplay();
+                        return false;
+                    }
+                }
+                
+                // Другие ошибки
+                this.showToast(errorMsg, 'error');
+                return false;
+            }
 
             // Если требуется подтверждение email
             if (data.needsCodeConfirmation) {
@@ -2629,11 +2723,39 @@ class NeonShop {
                 return true;
             }
 
-            this.showToast('Ошибка регистрации', 'error');
+            this.showToast(data.error || 'Ошибка регистрации', 'error');
             return false;
 
         } catch (error) {
-            this.showToast(error.message, 'error');
+            hideLoadingIndicator();
+            
+            // Улучшенная обработка ошибок
+            let errorMessage = error.message || 'Ошибка регистрации';
+            const errorStatus = error.status;
+            const errorData = error.data;
+            
+            // Если пользователь уже существует (из статуса или сообщения)
+            if (errorStatus === 400 || errorStatus === 409 || 
+                errorMessage.includes('уже существует') || 
+                errorMessage.includes('занято') || 
+                errorMessage.includes('duplicate') || 
+                errorMessage.includes('unique') ||
+                (errorData && (errorData.error?.includes('уже существует') || errorData.error?.includes('занято')))) {
+                
+                const finalErrorMsg = errorData?.error || errorData?.message || errorMessage || 'Пользователь с таким именем уже существует';
+                this.showFieldError('username-error', finalErrorMsg);
+                this.showToast(finalErrorMsg + '. Попробуйте войти или используйте другое имя', 'error');
+                this.currentRegisterStep = 1;
+                this.updateRegisterStepDisplay();
+                return false;
+            }
+            
+            // Если ошибка сети, возможно пользователь уже создан
+            if (errorMessage.includes('Network') || errorMessage.includes('fetch') || errorMessage.includes('сети')) {
+                this.showToast('Ошибка сети. Если регистрация не завершилась, попробуйте войти с вашими данными', 'error');
+            } else {
+                this.showToast(errorMessage, 'error');
+            }
             return false;
         }
     }
@@ -3199,6 +3321,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Глобальные функции
     window.shop = shop;
+    window.completeRegistrationWithPassword = () => shop.completeRegistrationWithPassword();
     window.loadProducts = loadProducts;
     window.checkout = checkout;
     window.logout = logout;

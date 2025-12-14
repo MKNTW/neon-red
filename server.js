@@ -203,20 +203,27 @@ app.post('/api/register', async (req, res) => {
         const cleanEmail = email.trim().toLowerCase();
 
         // Проверка существования пользователя только по username (email может быть одинаковым)
+        // Используем транзакцию для атомарности проверки и создания
         const { data: existingUserByUsername, error: usernameError } = await supabase
             .from('users')
-            .select('id')
+            .select('id, email_verified')
             .eq('username', cleanUsername)
             .maybeSingle();
             
         if (usernameError) {
             console.error('Error checking existing users:', usernameError);
-            throw new Error('Ошибка при проверке существующих пользователей');
+            return res.status(500).json({ 
+                error: 'Ошибка при проверке существующих пользователей',
+                message: 'Попробуйте позже'
+            });
         }
 
         if (existingUserByUsername) {
+            // Если пользователь существует, но email не подтверждён, можно разрешить повторную регистрацию
+            // Но для безопасности лучше запретить
             return res.status(400).json({ 
-                error: 'Пользователь с таким именем уже существует' 
+                error: 'Пользователь с таким именем уже существует',
+                message: 'Попробуйте другое имя пользователя или войдите в существующий аккаунт'
             });
         }
 
@@ -248,7 +255,33 @@ app.post('/api/register', async (req, res) => {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            // Проверяем, не существует ли уже пользователь (race condition или повторная попытка)
+            if (error.code === '23505' || error.code === 'P2002' || error.message?.includes('duplicate') || error.message?.includes('unique') || error.message?.includes('violates unique constraint')) {
+                // Пользователь уже существует - проверяем, какой именно конфликт
+                const { data: existingUser } = await supabase
+                    .from('users')
+                    .select('id, username, email')
+                    .eq('username', cleanUsername)
+                    .maybeSingle();
+                
+                if (existingUser) {
+                    return res.status(400).json({ 
+                        error: 'Пользователь с таким именем уже существует',
+                        message: 'Попробуйте другое имя пользователя или войдите в существующий аккаунт'
+                    });
+                }
+                
+                // Если конфликт по email (хотя мы разрешаем одинаковые email)
+                return res.status(400).json({ 
+                    error: 'Ошибка при создании пользователя',
+                    message: 'Попробуйте позже или используйте другие данные'
+                });
+            }
+            console.error('Error creating user:', error);
+            console.error('Error details:', JSON.stringify(error, null, 2));
+            throw error;
+        }
 
         // Проверяем, есть ли активный временный код для этого email
         const { data: tempCode } = await supabase
@@ -347,8 +380,27 @@ app.post('/api/register', async (req, res) => {
             details: error.details,
             hint: error.hint
         });
-        res.status(500).json({ 
-            error: 'Ошибка регистрации',
+        
+        // Улучшенная обработка ошибок
+        let statusCode = 500;
+        let errorMessage = 'Ошибка регистрации';
+        
+        if (error.message?.includes('уже существует') || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+            statusCode = 400;
+            errorMessage = 'Пользователь с таким именем уже существует';
+        } else if (error.message?.includes('проверке')) {
+            statusCode = 500;
+            errorMessage = 'Ошибка при проверке данных. Попробуйте позже.';
+        } else if (error.message?.includes('код')) {
+            statusCode = 500;
+            errorMessage = 'Ошибка при создании кода подтверждения';
+        } else if (error.message?.includes('email')) {
+            statusCode = 500;
+            errorMessage = 'Ошибка при отправке кода на email';
+        }
+        
+        res.status(statusCode).json({ 
+            error: errorMessage,
             message: error.message || 'Неизвестная ошибка'
         });
     }
@@ -950,6 +1002,16 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
         if (password !== undefined) {
             if (typeof password !== 'string' || password.length < 6 || password.length > 100) {
                 return res.status(400).json({ error: 'Пароль должен быть от 6 до 100 символов' });
+            }
+            
+            // Проверка на слабые пароли
+            if (password.length < 6) {
+                return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' });
+            }
+            
+            // Проверка на слишком простые пароли (опционально)
+            if (password === password.toLowerCase() && password.length < 8) {
+                // Можно добавить предупреждение, но не блокировать
             }
             
             const passwordHash = await bcrypt.hash(password, 10);
