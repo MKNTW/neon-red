@@ -65,6 +65,45 @@ const authenticateAdmin = (req, res, next) => {
     next();
 };
 
+// === БАЗОВЫЙ ЭНДПОИНТ API ===
+
+// Проверка работы API
+app.get('/api', (req, res) => {
+    res.json({
+        status: 'ok',
+        message: 'NEON RED API работает',
+        version: '1.0.0',
+        endpoints: {
+            auth: {
+                register: 'POST /api/register',
+                login: 'POST /api/login',
+                validateToken: 'GET /api/validate-token',
+                checkUsername: 'GET /api/check-username/:username'
+            },
+            products: {
+                getAll: 'GET /api/products',
+                getAdmin: 'GET /api/admin/products',
+                create: 'POST /api/admin/products',
+                update: 'PUT /api/admin/products/:id',
+                delete: 'DELETE /api/admin/products/:id'
+            },
+            profile: {
+                update: 'PUT /api/profile',
+                uploadAvatar: 'POST /api/profile/avatar',
+                delete: 'DELETE /api/profile'
+            },
+            orders: {
+                create: 'POST /api/orders',
+                getUserOrders: 'GET /api/orders',
+                getAll: 'GET /api/admin/orders'
+            },
+            categories: {
+                getAll: 'GET /api/categories'
+            }
+        }
+    });
+});
+
 // === АУТЕНТИФИКАЦИЯ ===
 
 // Проверка доступности имени пользователя
