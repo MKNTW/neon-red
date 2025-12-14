@@ -114,6 +114,12 @@ class NeonShop {
         this.productsEventDelegate = false; // Флаг для делегирования событий
         this.pendingVerificationEmail = null; // Email для подтверждения
         this.resendCodeTimer = null; // Таймер для повторной отправки
+        this.pendingEmailChange = null; // Новый email для смены
+        this.resendEmailChangeTimer = null; // Таймер для повторной отправки кода смены email
+        this.pendingRegistrationToken = null; // Токен после подтверждения email
+        this.pendingRegistrationUser = null; // Данные пользователя после подтверждения email
+        this.pendingEmailChange = null; // Новый email для смены
+        this.resendEmailChangeTimer = null; // Таймер для повторной отправки кода смены email
 
         // Автоматическое определение URL для API
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -2351,12 +2357,37 @@ class NeonShop {
             // Автоматически отправляем код проверки email
             this.sendEmailVerificationCode(email);
         } else if (currentStep === 3) {
-            const fullName = document.getElementById('register-fullname')?.value.trim();
-            this.registerData.fullName = fullName;
+            // Шаг 3: Пароль
+            const password = document.getElementById('register-password')?.value;
+            const password2 = document.getElementById('register-password2')?.value;
+            
+            if (!password) {
+                this.showFieldError('password-error', 'Введите пароль');
+                return;
+            }
+            
+            if (password.length < 6) {
+                this.showFieldError('password-error', 'Пароль должен быть не менее 6 символов');
+                return;
+            }
+            
+            if (password !== password2) {
+                this.showFieldError('password-error', 'Пароли не совпадают');
+                return;
+            }
+            
+            this.registerData.password = password;
+            this.hideFieldError('password-error');
+            // На шаге 3 отправляем форму регистрации
+            const form = document.getElementById('register-form');
+            if (form) {
+                form.requestSubmit();
+            }
+            return; // Не переходим дальше, форма отправится
         }
         
-        // Не переходим на шаг 5 автоматически - он показывается только после регистрации
-        if (currentStep < 4) {
+        // Переход между шагами 1 и 2
+        if (currentStep < 3) {
             this.currentRegisterStep = currentStep + 1;
             this.updateRegisterStepDisplay();
         }
@@ -2371,8 +2402,51 @@ class NeonShop {
     
     skipFullName() {
         this.registerData.fullName = '';
-        this.currentRegisterStep = 4;
-        this.updateRegisterStepDisplay();
+        this.completeRegistration();
+    }
+
+    async completeRegistration() {
+        const fullName = document.getElementById('register-fullname')?.value.trim();
+        
+        // Обновляем полное имя, если оно было введено
+        if (fullName && this.pendingRegistrationUser) {
+            try {
+                const response = await safeFetch(`${this.API_BASE_URL}/profile`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.pendingRegistrationToken}`
+                    },
+                    body: JSON.stringify({ fullName })
+                });
+
+                const data = await response.json();
+                if (data.user) {
+                    this.pendingRegistrationUser = data.user;
+                }
+            } catch (error) {
+                console.log('Error updating full name:', error);
+                // Продолжаем даже если не удалось обновить имя
+            }
+        }
+
+        // Автоматически входим в аккаунт
+        if (this.pendingRegistrationToken && this.pendingRegistrationUser) {
+            this.user = this.pendingRegistrationUser;
+            this.token = this.pendingRegistrationToken;
+            localStorage.setItem('user', JSON.stringify(this.user));
+            localStorage.setItem('token', this.token);
+            this.updateAuthUI();
+            this.showToast('Регистрация завершена! Вы автоматически вошли в аккаунт', 'success');
+            this.closeAuthModal();
+            await this.loadProducts();
+            
+            // Сброс формы регистрации
+            this.setupRegisterSteps();
+            this.updateRegisterStepDisplay();
+            this.pendingRegistrationToken = null;
+            this.pendingRegistrationUser = null;
+        }
     }
     
     updateRegisterStepDisplay() {
@@ -2461,8 +2535,8 @@ class NeonShop {
             // Если требуется подтверждение email
             if (data.needsCodeConfirmation) {
                 this.pendingVerificationEmail = data.email;
-                // Показываем шаг 5 (ввод кода)
-                this.currentRegisterStep = 5;
+                // Показываем шаг 4 (ввод кода)
+                this.currentRegisterStep = 4;
                 this.updateRegisterStepDisplay();
                 // Устанавливаем email в поле
                 const emailEl = document.getElementById('verification-email');
@@ -2539,13 +2613,22 @@ class NeonShop {
             const data = await response.json();
 
             if (data.success) {
-                this.showToast('Email успешно подтверждён! Теперь можно войти', 'success');
+                // Сохраняем токен и данные пользователя для завершения регистрации
+                if (data.token && data.user) {
+                    this.pendingRegistrationToken = data.token;
+                    this.pendingRegistrationUser = data.user;
+                    
+                    // Переходим на шаг 5 (полное имя)
+                    this.currentRegisterStep = 5;
+                    this.updateRegisterStepDisplay();
+                    
+                    this.showToast('Email подтверждён! Завершите регистрацию', 'success');
+                } else {
+                    this.showToast('Email успешно подтверждён! Теперь можно войти', 'success');
+                    showLoginForm();
+                }
+                
                 this.pendingVerificationEmail = null;
-                // Показываем форму входа
-                showLoginForm();
-                // Сброс формы регистрации
-                this.setupRegisterSteps();
-                this.updateRegisterStepDisplay();
                 if (this.resendCodeTimer) {
                     clearInterval(this.resendCodeTimer);
                     this.resendCodeTimer = null;
@@ -3059,11 +3142,9 @@ function saveProfileField(field) {
         }
         
         if (field === 'email') {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(value)) {
-                shop.showToast('Неверный формат email', 'error');
-                return;
-            }
+            // Смена email обрабатывается отдельной функцией с подтверждением через код
+            shop.changeEmail();
+            return;
         }
         
         if (field === 'username' && (value.length < 3 || value.length > 50)) {

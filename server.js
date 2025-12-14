@@ -193,29 +193,21 @@ app.post('/api/register', async (req, res) => {
         const cleanUsername = username.trim();
         const cleanEmail = email.trim().toLowerCase();
 
-        // Проверка существования пользователя (используем параметризованные запросы)
+        // Проверка существования пользователя только по username (email может быть одинаковым)
         const { data: existingUserByUsername, error: usernameError } = await supabase
             .from('users')
             .select('id')
             .eq('username', cleanUsername)
             .maybeSingle();
             
-        const { data: existingUserByEmail, error: emailError } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', cleanEmail)
-            .maybeSingle();
-            
-        if (usernameError || emailError) {
-            console.error('Error checking existing users:', usernameError || emailError);
+        if (usernameError) {
+            console.error('Error checking existing users:', usernameError);
             throw new Error('Ошибка при проверке существующих пользователей');
         }
-            
-        const existingUser = existingUserByUsername || existingUserByEmail;
 
-        if (existingUser) {
+        if (existingUserByUsername) {
             return res.status(400).json({ 
-                error: 'Пользователь с таким email или username уже существует' 
+                error: 'Пользователь с таким именем уже существует' 
             });
         }
 
@@ -313,11 +305,31 @@ app.post('/api/register', async (req, res) => {
             }
         }
 
+        // Создаём JWT токен для автоматического входа после подтверждения
+        const token = jwt.sign(
+            { 
+                id: user.id, 
+                username: user.username, 
+                isAdmin: user.is_admin 
+            },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
         res.status(201).json({
             success: true,
             needsCodeConfirmation: true,
             message: 'Код подтверждения отправлен на почту',
-            email: cleanEmail
+            email: cleanEmail,
+            token: token, // Токен для автоматического входа после подтверждения
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                fullName: user.full_name,
+                isAdmin: user.is_admin,
+                emailVerified: false
+            }
         });
 
     } catch (error) {
@@ -607,9 +619,36 @@ app.post('/api/confirm-email', async (req, res) => {
             .delete()
             .eq('user_id', user.id);
 
+        // Создаём JWT токен для автоматического входа
+        const token = jwt.sign(
+            { 
+                id: user.id, 
+                username: user.username, 
+                isAdmin: user.is_admin 
+            },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        // Получаем обновлённые данные пользователя
+        const { data: updatedUser } = await supabase
+            .from('users')
+            .select('id, username, email, full_name, is_admin, email_verified')
+            .eq('id', user.id)
+            .single();
+
         res.json({
             success: true,
-            message: 'Email успешно подтверждён'
+            message: 'Email успешно подтверждён',
+            token: token,
+            user: {
+                id: updatedUser.id,
+                username: updatedUser.username,
+                email: updatedUser.email,
+                fullName: updatedUser.full_name,
+                isAdmin: updatedUser.is_admin,
+                emailVerified: updatedUser.email_verified
+            }
         });
 
     } catch (error) {
@@ -887,26 +926,8 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
         }
         
         if (email !== undefined) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (typeof email !== 'string' || !emailRegex.test(email.trim())) {
-                return res.status(400).json({ error: 'Неверный формат email' });
-            }
-            
-            const cleanEmail = email.trim().toLowerCase();
-            
-            // Проверка на существование
-            const { data: existing } = await supabase
-                .from('users')
-                .select('id')
-                .eq('email', cleanEmail)
-                .neq('id', userId)
-                .single();
-                
-            if (existing) {
-                return res.status(400).json({ error: 'Email уже используется' });
-            }
-            
-            updates.email = cleanEmail;
+            // Смена email требует подтверждения через код, обрабатывается отдельным endpoint
+            return res.status(400).json({ error: 'Для смены email используйте /api/profile/change-email' });
         }
         
         if (fullName !== undefined) {
@@ -955,6 +976,183 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Update profile error:', error);
         res.status(500).json({ error: 'Ошибка обновления профиля' });
+    }
+});
+
+// Отправка кода для смены email
+app.post('/api/profile/change-email', authenticateToken, async (req, res) => {
+    try {
+        const { email } = req.body;
+        const userId = req.user.id;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Требуется email' });
+        }
+
+        const cleanEmail = email.trim().toLowerCase();
+
+        // Валидация email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(cleanEmail)) {
+            return res.status(400).json({ error: 'Неверный формат email' });
+        }
+
+        // Проверяем, не используется ли уже этот email другим пользователем
+        const { data: existingUser } = await supabase
+            .from('users')
+            .select('id, email')
+            .eq('email', cleanEmail)
+            .neq('id', userId)
+            .maybeSingle();
+
+        if (existingUser) {
+            return res.status(400).json({ error: 'Этот email уже используется другим пользователем' });
+        }
+
+        // Проверяем последнюю отправку кода для смены email
+        const { data: lastCode } = await supabase
+            .from('email_verifications')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('email', cleanEmail)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (lastCode && lastCode.last_sent_at) {
+            const diff = Date.now() - new Date(lastCode.last_sent_at).getTime();
+            if (diff < 60000) {
+                const secondsLeft = Math.ceil((60000 - diff) / 1000);
+                return res.status(429).json({
+                    error: 'Подождите перед повторной отправкой',
+                    message: `Подождите ${secondsLeft} секунд перед повторной отправкой`
+                });
+            }
+
+            // Удаляем старый код
+            await supabase
+                .from('email_verifications')
+                .delete()
+                .eq('id', lastCode.id);
+        }
+
+        // Генерируем код
+        const code = generateCode();
+        const codeHash = await bcrypt.hash(code, 10);
+
+        // Сохраняем код для смены email
+        const { error: insertError } = await supabase
+            .from('email_verifications')
+            .insert([{
+                user_id: userId,
+                email: cleanEmail,
+                code_hash: codeHash,
+                expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+                last_sent_at: new Date().toISOString()
+            }]);
+
+        if (insertError) {
+            console.error('Error saving email change code:', insertError);
+            return res.status(500).json({ error: 'Ошибка при создании кода' });
+        }
+
+        // Отправляем код
+        try {
+            await sendVerificationCode(cleanEmail, code);
+        } catch (emailError) {
+            console.error('Error sending email:', emailError);
+            await supabase
+                .from('email_verifications')
+                .delete()
+                .eq('code_hash', codeHash);
+            return res.status(500).json({ error: 'Ошибка при отправке кода на email' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Код подтверждения отправлен на новый email'
+        });
+
+    } catch (error) {
+        console.error('Change email error:', error);
+        res.status(500).json({ error: 'Ошибка отправки кода' });
+    }
+});
+
+// Подтверждение смены email
+app.post('/api/profile/confirm-email-change', authenticateToken, async (req, res) => {
+    try {
+        const { email, code } = req.body;
+        const userId = req.user.id;
+
+        if (!email || !code) {
+            return res.status(400).json({ error: 'Требуются email и код' });
+        }
+
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanCode = code.trim();
+
+        // Находим код подтверждения
+        const { data: record } = await supabase
+            .from('email_verifications')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('email', cleanEmail)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (!record) {
+            return res.status(400).json({ error: 'Код не найден' });
+        }
+
+        if (new Date(record.expires_at) < new Date()) {
+            return res.status(400).json({ error: 'Код истёк' });
+        }
+
+        const valid = await bcrypt.compare(cleanCode, record.code_hash);
+        if (!valid) {
+            return res.status(400).json({ error: 'Неверный код' });
+        }
+
+        // Обновляем email
+        const { data: updatedUser, error: updateError } = await supabase
+            .from('users')
+            .update({ 
+                email: cleanEmail,
+                email_verified: true
+            })
+            .eq('id', userId)
+            .select('id, username, email, full_name, is_admin, email_verified')
+            .single();
+
+        if (updateError) {
+            console.error('Error updating email:', updateError);
+            return res.status(500).json({ error: 'Ошибка при обновлении email' });
+        }
+
+        // Удаляем использованный код
+        await supabase
+            .from('email_verifications')
+            .delete()
+            .eq('id', record.id);
+
+        res.json({
+            success: true,
+            message: 'Email успешно изменён',
+            user: {
+                id: updatedUser.id,
+                username: updatedUser.username,
+                email: updatedUser.email,
+                fullName: updatedUser.full_name,
+                isAdmin: updatedUser.is_admin,
+                emailVerified: updatedUser.email_verified
+            }
+        });
+
+    } catch (error) {
+        console.error('Confirm email change error:', error);
+        res.status(500).json({ error: 'Ошибка подтверждения смены email' });
     }
 });
 

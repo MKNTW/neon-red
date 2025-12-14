@@ -98,7 +98,7 @@
                     </div>
                 </div>
 
-                <!-- Шаг 3: Полное имя (необязательно) -->
+                <!-- Шаг 3: Пароль -->
                 <div class="register-step" data-step="3">
                     <div class="step-indicator">
                         <div class="step-number completed">✓</div>
@@ -108,30 +108,6 @@
                         <div class="step-number active">3</div>
                         <div class="step-line"></div>
                         <div class="step-number">4</div>
-                        <div class="step-line"></div>
-                        <div class="step-number">5</div>
-                    </div>
-                    <div class="input-group">
-                        <label for="register-fullname">Полное имя (необязательно)</label>
-                        <input type="text" id="register-fullname" placeholder="Введите полное имя" autocomplete="name">
-                    </div>
-                    <div class="step-buttons">
-                        <button type="button" class="auth-btn secondary-btn" onclick="shop.prevRegisterStep()">Назад</button>
-                        <button type="button" class="auth-btn skip-btn" onclick="shop.skipFullName()">Пропустить</button>
-                        <button type="button" class="auth-btn primary-btn" onclick="shop.nextRegisterStep()">Далее</button>
-                    </div>
-                </div>
-
-                <!-- Шаг 4: Пароль -->
-                <div class="register-step" data-step="4">
-                    <div class="step-indicator">
-                        <div class="step-number completed">✓</div>
-                        <div class="step-line completed"></div>
-                        <div class="step-number completed">✓</div>
-                        <div class="step-line completed"></div>
-                        <div class="step-number completed">✓</div>
-                        <div class="step-line completed"></div>
-                        <div class="step-number active">4</div>
                         <div class="step-line"></div>
                         <div class="step-number">5</div>
                     </div>
@@ -151,8 +127,8 @@
                     </div>
                 </div>
 
-                <!-- Шаг 5: Подтверждение email -->
-                <div class="register-step" data-step="5">
+                <!-- Шаг 4: Подтверждение email -->
+                <div class="register-step" data-step="4">
                     <div class="step-indicator">
                         <div class="step-number completed">✓</div>
                         <div class="step-line completed"></div>
@@ -160,9 +136,9 @@
                         <div class="step-line completed"></div>
                         <div class="step-number completed">✓</div>
                         <div class="step-line completed"></div>
-                        <div class="step-number completed">✓</div>
-                        <div class="step-line completed"></div>
-                        <div class="step-number active">5</div>
+                        <div class="step-number active">4</div>
+                        <div class="step-line"></div>
+                        <div class="step-number">5</div>
                     </div>
                     <div class="input-group">
                         <label for="register-code">Код подтверждения</label>
@@ -177,6 +153,29 @@
                         <button type="button" id="resend-code-btn" class="auth-btn secondary-btn" onclick="shop.resendVerificationCode()" style="font-size: 14px; padding: 8px 16px;">
                             Отправить код заново
                         </button>
+                    </div>
+                </div>
+
+                <!-- Шаг 5: Полное имя (после подтверждения кода) -->
+                <div class="register-step" data-step="5">
+                    <div class="step-indicator">
+                        <div class="step-number completed">✓</div>
+                        <div class="step-line completed"></div>
+                        <div class="step-number completed">✓</div>
+                        <div class="step-line completed"></div>
+                        <div class="step-number completed">✓</div>
+                        <div class="step-line completed"></div>
+                        <div class="step-number completed">✓</div>
+                        <div class="step-line completed"></div>
+                        <div class="step-number active">5</div>
+                    </div>
+                    <div class="input-group">
+                        <label for="register-fullname">Полное имя (необязательно)</label>
+                        <input type="text" id="register-fullname" placeholder="Введите полное имя" autocomplete="name">
+                    </div>
+                    <div class="step-buttons">
+                        <button type="button" class="auth-btn skip-btn" onclick="shop.skipFullName()">Пропустить</button>
+                        <button type="button" class="auth-btn primary-btn" onclick="shop.completeRegistration()">Завершить регистрацию</button>
                     </div>
                 </div>
 
@@ -238,8 +237,22 @@
                         <div class="profile-edit-form" id="edit-email-form" style="display: none;">
                             <input type="email" id="edit-email-input" placeholder="Новый email">
                             <div class="profile-edit-actions">
-                                <button class="profile-save-btn" onclick="saveProfileField('email')">Сохранить</button>
+                                <button class="profile-save-btn" onclick="shop.changeEmail()">Отправить код</button>
                                 <button class="profile-cancel-btn" onclick="cancelEdit('email')">Отмена</button>
+                            </div>
+                        </div>
+                        <div class="profile-edit-form" id="edit-email-code-form" style="display: none;">
+                            <p style="color: #888; font-size: 14px; margin-bottom: 10px;">Код подтверждения отправлен на <strong id="new-email-display"></strong></p>
+                            <input type="text" id="edit-email-code-input" placeholder="Введите 6-значный код" maxlength="6" pattern="[0-9]{6}">
+                            <div class="input-error" id="email-code-error"></div>
+                            <div class="profile-edit-actions">
+                                <button class="profile-save-btn" onclick="shop.confirmEmailChange()">Подтвердить</button>
+                                <button class="profile-cancel-btn" onclick="shop.cancelEmailChange()">Отмена</button>
+                            </div>
+                            <div style="margin-top: 10px; text-align: center;">
+                                <button type="button" id="resend-email-change-btn" class="profile-cancel-btn" onclick="shop.resendEmailChangeCode()" style="font-size: 12px; padding: 6px 12px;">
+                                    Отправить код заново
+                                </button>
                             </div>
                         </div>
                     </div>
