@@ -166,22 +166,45 @@ export class AuthModule {
             return;
         }
         
-        const yesBtn = document.getElementById('age-yes');
-        const noBtn = document.getElementById('age-no');
+        // Убеждаемся, что DOM загружен
+        const setupButtons = () => {
+            const yesBtn = document.getElementById('age-yes');
+            const noBtn = document.getElementById('age-no');
+            
+            if (yesBtn) {
+                // Удаляем старый обработчик, если есть
+                yesBtn.replaceWith(yesBtn.cloneNode(true));
+                const newYesBtn = document.getElementById('age-yes');
+                newYesBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    localStorage.setItem('ageVerified', 'true');
+                    const modal = document.getElementById('age-verification-modal');
+                    if (modal) {
+                        modal.style.display = 'none';
+                        document.body.style.overflow = '';
+                    }
+                });
+            }
+            
+            if (noBtn) {
+                // Удаляем старый обработчик, если есть
+                noBtn.replaceWith(noBtn.cloneNode(true));
+                const newNoBtn = document.getElementById('age-no');
+                newNoBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert('Доступ к сайту ограничен для лиц младше 18 лет.');
+                    window.location.href = 'https://www.google.com';
+                });
+            }
+        };
         
-        if (yesBtn) {
-            yesBtn.addEventListener('click', () => {
-                localStorage.setItem('ageVerified', 'true');
-                const modal = document.getElementById('age-verification-modal');
-                if (modal) modal.style.display = 'none';
-            });
-        }
-        
-        if (noBtn) {
-            noBtn.addEventListener('click', () => {
-                alert('Доступ к сайту ограничен для лиц младше 18 лет.');
-                window.location.href = 'https://www.google.com';
-            });
+        // Если DOM уже загружен, устанавливаем сразу
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupButtons);
+        } else {
+            setupButtons();
         }
     }
 

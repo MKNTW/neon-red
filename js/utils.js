@@ -198,6 +198,10 @@ export function removeToast(toastId) {
 
 export function closeAllModals() {
     document.querySelectorAll('.modal').forEach(modal => {
+        // Не закрываем модалку проверки возраста
+        if (modal.id === 'age-verification-modal') {
+            return;
+        }
         modal.style.display = 'none';
     });
     document.body.style.overflow = '';

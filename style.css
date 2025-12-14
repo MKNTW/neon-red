@@ -4158,6 +4158,7 @@ input, textarea, [contenteditable] {
     background: rgba(0, 0, 0, 0.98) !important;
     backdrop-filter: blur(30px);
     z-index: 10000 !important;
+    pointer-events: all !important;
 }
 
 .age-verification-content {
@@ -4170,6 +4171,8 @@ input, textarea, [contenteditable] {
     border-radius: 20px;
     position: relative;
     overflow: hidden;
+    pointer-events: all !important;
+    z-index: 10001 !important;
 }
 
 .age-verification-content::before {
@@ -4246,6 +4249,10 @@ input, textarea, [contenteditable] {
     overflow: hidden;
     text-transform: uppercase;
     letter-spacing: 1px;
+    pointer-events: all !important;
+    z-index: 10002 !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .age-yes-btn {

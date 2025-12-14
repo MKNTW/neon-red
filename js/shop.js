@@ -112,8 +112,13 @@ export class NeonShop {
         }
 
         // Закрытие модальных окон по клику вне области
+        // НЕ закрываем модалку проверки возраста при клике вне её
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
+                // Проверяем, не является ли это модалкой проверки возраста
+                if (e.target.id === 'age-verification-modal') {
+                    return; // Не закрываем модалку проверки возраста
+                }
                 closeAllModals();
                 this.closeCartModal();
             }
