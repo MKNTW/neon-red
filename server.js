@@ -928,25 +928,50 @@ app.post('/api/resend-code', async (req, res) => {
 // Вход
 app.post('/api/login', async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { username, email, password } = req.body;
         
         // Валидация
-        if (!username || !password) {
-            return res.status(400).json({ error: 'Требуются username и password' });
+        const loginValue = username || email;
+        if (!loginValue || !password) {
+            return res.status(400).json({ error: 'Требуются username/email и password' });
         }
         
-        if (typeof username !== 'string' || typeof password !== 'string') {
+        if (typeof loginValue !== 'string' || typeof password !== 'string') {
             return res.status(400).json({ error: 'Неверный формат данных' });
         }
 
-        // Поиск пользователя (используем параметризованный запрос)
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('username', username.trim())
-            .single();
+        const cleanValue = loginValue.trim();
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanValue);
 
-        if (error || !user) {
+        // Поиск пользователя по username или email
+        let user, error;
+        
+        if (isEmail) {
+            // Поиск по email
+            const result = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', cleanValue.toLowerCase())
+                .maybeSingle();
+            user = result.data;
+            error = result.error;
+        } else {
+            // Поиск по username
+            const result = await supabase
+                .from('users')
+                .select('*')
+                .eq('username', cleanValue)
+                .maybeSingle();
+            user = result.data;
+            error = result.error;
+        }
+
+        if (error) {
+            console.error('Login query error:', error);
+            return res.status(500).json({ error: 'Ошибка при поиске пользователя' });
+        }
+        
+        if (!user) {
             return res.status(401).json({ error: 'Неверные учетные данные' });
         }
 

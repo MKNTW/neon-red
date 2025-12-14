@@ -1620,7 +1620,7 @@ class NeonShop {
             this.resendEmailChangeTimer = null;
         }
         
-        // Очищаем pendingEmailChange
+        // Очищаем все данные смены email
         this.pendingEmailChange = null;
         
         // Сбрасываем кнопку
@@ -1629,26 +1629,104 @@ class NeonShop {
             resendBtn.textContent = 'Отправить код заново';
             resendBtn.disabled = false;
         }
+        
+        // Очищаем отображение email
+        const emailDisplay = document.getElementById('new-email-display');
+        if (emailDisplay) {
+            emailDisplay.textContent = '';
+        }
     }
     
     // === ВОССТАНОВЛЕНИЕ ПАРОЛЯ ===
-    showForgotPassword() {
-        document.getElementById('login-form').style.display = 'none';
-        document.getElementById('register-form').style.display = 'none';
-        document.getElementById('forgot-password-form').style.display = 'block';
-        document.getElementById('select-account-form').style.display = 'none';
-        document.getElementById('reset-password-form').style.display = 'none';
-        document.getElementById('auth-title').textContent = 'Восстановление пароля';
-        document.getElementById('auth-subtitle').textContent = 'Введите email для восстановления';
+    openForgotPasswordModal() {
+        const modal = document.getElementById('forgot-password-modal');
+        if (!modal) return;
         
+        // Закрываем модалку авторизации если открыта
+        this.closeAuthModal();
+        
+        // Показываем модалку восстановления пароля
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        
+        // Сбрасываем формы
+        this.resetForgotPasswordForms();
+    }
+    
+    closeForgotPasswordModal() {
+        const modal = document.getElementById('forgot-password-modal');
+        if (!modal) return;
+        
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        
+        // Сбрасываем все данные
+        this.resetForgotPasswordData();
+    }
+    
+    resetForgotPasswordForms() {
+        // Показываем первую форму
+        const forgotForm = document.getElementById('forgot-password-form');
+        const selectForm = document.getElementById('select-account-form');
+        const resetForm = document.getElementById('reset-password-form');
+        
+        if (forgotForm) forgotForm.style.display = 'block';
+        if (selectForm) selectForm.style.display = 'none';
+        if (resetForm) resetForm.style.display = 'none';
+        
+        // Обновляем заголовки
+        const title = document.getElementById('forgot-password-title');
+        const subtitle = document.getElementById('forgot-password-subtitle');
+        if (title) title.textContent = 'Восстановление пароля';
+        if (subtitle) subtitle.textContent = 'Введите email для восстановления';
+        
+        // Очищаем все поля
+        this.resetForgotPasswordData();
+    }
+    
+    resetForgotPasswordData() {
         // Очищаем поля
         const emailInput = document.getElementById('forgot-email');
+        const codeInput = document.getElementById('reset-code');
+        const passwordInput = document.getElementById('reset-password');
+        const password2Input = document.getElementById('reset-password2');
+        
         if (emailInput) emailInput.value = '';
-        const errorEl = document.getElementById('forgot-email-error');
-        if (errorEl) {
-            errorEl.textContent = '';
-            errorEl.style.display = 'none';
+        if (codeInput) codeInput.value = '';
+        if (passwordInput) passwordInput.value = '';
+        if (password2Input) password2Input.value = '';
+        
+        // Очищаем ошибки
+        const errorEls = ['forgot-email-error', 'reset-code-error', 'reset-password-error'];
+        errorEls.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = '';
+                el.style.display = 'none';
+            }
+        });
+        
+        // Очищаем данные
+        this.pendingResetEmail = null;
+        this.pendingResetUserId = null;
+        
+        // Очищаем таймер
+        if (this.resendResetTimer) {
+            clearInterval(this.resendResetTimer);
+            this.resendResetTimer = null;
         }
+        
+        // Сбрасываем кнопку
+        const resendBtn = document.getElementById('resend-reset-code-btn');
+        if (resendBtn) {
+            resendBtn.textContent = 'Отправить код заново';
+            resendBtn.disabled = false;
+        }
+    }
+    
+    showForgotPassword() {
+        // Устаревшая функция, используем openForgotPasswordModal
+        this.openForgotPasswordModal();
     }
     
     async sendPasswordResetCode() {
@@ -1723,6 +1801,14 @@ class NeonShop {
                 return true;
             }
             
+            // Если успешно, но нет аккаунтов в ответе, пробуем найти по userId
+            if (data.success && data.userId) {
+                this.pendingResetEmail = email.toLowerCase();
+                this.pendingResetUserId = data.userId;
+                this.showResetPasswordForm();
+                return true;
+            }
+            
             this.showToast('Ошибка: неожиданный ответ сервера', 'error');
             return false;
         } catch (error) {
@@ -1737,10 +1823,17 @@ class NeonShop {
     }
     
     showAccountSelection(accounts) {
-        document.getElementById('forgot-password-form').style.display = 'none';
-        document.getElementById('select-account-form').style.display = 'block';
-        document.getElementById('auth-title').textContent = 'Выберите аккаунт';
-        document.getElementById('auth-subtitle').textContent = 'Найдено несколько аккаунтов';
+        const forgotForm = document.getElementById('forgot-password-form');
+        const selectForm = document.getElementById('select-account-form');
+        const resetForm = document.getElementById('reset-password-form');
+        const title = document.getElementById('forgot-password-title');
+        const subtitle = document.getElementById('forgot-password-subtitle');
+        
+        if (forgotForm) forgotForm.style.display = 'none';
+        if (selectForm) selectForm.style.display = 'block';
+        if (resetForm) resetForm.style.display = 'none';
+        if (title) title.textContent = 'Выберите аккаунт';
+        if (subtitle) subtitle.textContent = 'Найдено несколько аккаунтов';
         
         const accountsList = document.getElementById('accounts-list');
         if (!accountsList) return;
@@ -1751,8 +1844,8 @@ class NeonShop {
             accountDiv.className = 'account-item';
             accountDiv.style.cssText = 'padding: 15px; margin-bottom: 10px; background: rgba(255,255,255,0.05); border: 2px solid var(--border-color); border-radius: 10px; cursor: pointer; transition: all 0.3s;';
             accountDiv.innerHTML = `
-                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">${account.username}</div>
-                <div style="font-size: 0.9rem; color: var(--text-secondary);">${account.email}</div>
+                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">${escapeHtml(account.username)}</div>
+                <div style="font-size: 0.9rem; color: var(--text-secondary);">${escapeHtml(account.email)}</div>
             `;
             accountDiv.addEventListener('click', () => {
                 this.pendingResetUserId = account.id;
@@ -1771,15 +1864,21 @@ class NeonShop {
     }
     
     backToForgotPassword() {
-        this.showForgotPassword();
+        this.resetForgotPasswordForms();
     }
     
     showResetPasswordForm() {
-        document.getElementById('forgot-password-form').style.display = 'none';
-        document.getElementById('select-account-form').style.display = 'none';
-        document.getElementById('reset-password-form').style.display = 'block';
-        document.getElementById('auth-title').textContent = 'Смена пароля';
-        document.getElementById('auth-subtitle').textContent = 'Введите код и новый пароль';
+        const forgotForm = document.getElementById('forgot-password-form');
+        const selectForm = document.getElementById('select-account-form');
+        const resetForm = document.getElementById('reset-password-form');
+        const title = document.getElementById('forgot-password-title');
+        const subtitle = document.getElementById('forgot-password-subtitle');
+        
+        if (forgotForm) forgotForm.style.display = 'none';
+        if (selectForm) selectForm.style.display = 'none';
+        if (resetForm) resetForm.style.display = 'block';
+        if (title) title.textContent = 'Смена пароля';
+        if (subtitle) subtitle.textContent = 'Введите код и новый пароль';
         
         const emailDisplay = document.getElementById('reset-email-display');
         if (emailDisplay && this.pendingResetEmail) {
@@ -1793,6 +1892,18 @@ class NeonShop {
         if (codeInput) codeInput.value = '';
         if (passwordInput) passwordInput.value = '';
         if (password2Input) password2Input.value = '';
+        
+        // Очищаем ошибки
+        const codeError = document.getElementById('reset-code-error');
+        const passwordError = document.getElementById('reset-password-error');
+        if (codeError) {
+            codeError.textContent = '';
+            codeError.style.display = 'none';
+        }
+        if (passwordError) {
+            passwordError.textContent = '';
+            passwordError.style.display = 'none';
+        }
         
         // Запускаем таймер
         this.startResendResetTimer();
@@ -1897,6 +2008,9 @@ class NeonShop {
             if (data.success) {
                 this.showToast('Пароль успешно изменён! Выполняется вход...', 'success');
                 
+                // Закрываем модалку восстановления пароля
+                this.closeForgotPasswordModal();
+                
                 // Автоматический вход
                 if (data.token && data.user) {
                     this.user = data.user;
@@ -1904,23 +2018,18 @@ class NeonShop {
                     localStorage.setItem('user', JSON.stringify(this.user));
                     localStorage.setItem('token', this.token);
                     this.updateAuthUI();
-                    this.closeAuthModal();
                     await this.loadProducts();
                 } else {
                     // Если токен не передан, предлагаем войти
                     setTimeout(() => {
+                        this.openAuthModal();
                         showLoginForm();
                         this.showToast('Теперь войдите с новым паролем', 'info');
                     }, 2000);
                 }
                 
                 // Очищаем данные
-                this.pendingResetEmail = null;
-                this.pendingResetUserId = null;
-                if (this.resendResetTimer) {
-                    clearInterval(this.resendResetTimer);
-                    this.resendResetTimer = null;
-                }
+                this.resetForgotPasswordData();
                 
                 return true;
             }
@@ -2646,9 +2755,9 @@ class NeonShop {
         if (loginForm) {
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const username = document.getElementById('login-username').value;
+                const usernameOrEmail = document.getElementById('login-username').value.trim();
                 const password = document.getElementById('login-password').value;
-                await this.login(username, password);
+                await this.login(usernameOrEmail, password);
             });
         }
 
@@ -3033,15 +3142,28 @@ class NeonShop {
 
     // === ОСТАЛЬНЫЕ МЕТОДЫ (без изменений, но с учетом мобильных) ===
     // === ОСТАЛЬНЫЕ МЕТОДЫ ===
-    async login(username, password) {
+    async login(usernameOrEmail, password) {
         try {
+            // Определяем, это email или username
+            const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(usernameOrEmail);
+            
             const response = await safeFetch(`${this.API_BASE_URL}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ 
+                    username: usernameOrEmail,
+                    email: isEmail ? usernameOrEmail : undefined,
+                    password 
+                })
             });
 
             const data = await response.json();
+
+            if (!response.ok) {
+                const errorMsg = data?.error || data?.message || 'Ошибка входа';
+                this.showToast(errorMsg, 'error');
+                return false;
+            }
 
             this.user = data.user;
             this.token = data.token;
@@ -3059,7 +3181,11 @@ class NeonShop {
             return true;
 
         } catch (error) {
-            this.showToast(error.message, 'error');
+            let errorMessage = error.message || 'Ошибка входа';
+            if (error.data) {
+                errorMessage = error.data.error || error.data.message || errorMessage;
+            }
+            this.showToast(errorMessage, 'error');
             return false;
         }
     }
@@ -4446,6 +4572,12 @@ function showLoginForm() {
     document.getElementById('register-form').style.display = 'none';
     document.getElementById('auth-title').textContent = 'Вход';
     document.getElementById('auth-subtitle').textContent = 'Войдите в свой аккаунт';
+    
+    // Очищаем поля входа
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    if (usernameInput) usernameInput.value = '';
+    if (passwordInput) passwordInput.value = '';
 }
 
 function showRegisterForm() {
