@@ -121,6 +121,9 @@ class NeonShop {
         this.products = [];
         this.user = JSON.parse(localStorage.getItem('user')) || null;
         this.token = localStorage.getItem('token') || null;
+        this.currentPage = 1;
+        this.totalPages = 1;
+        this.totalProducts = 0;
         // Категории больше не используются
         this.productsEventDelegate = false; // Флаг для делегирования событий
         this.pendingVerificationEmail = null; // Email для подтверждения
@@ -2241,14 +2244,14 @@ class NeonShop {
 
         if (!this.products || this.products.length === 0) {
             const emptyDiv = document.createElement('div');
-            emptyDiv.className = 'empty-state';
-            emptyDiv.style.cssText = 'text-align:center; padding:60px 20px; grid-column:1/-1;';
-            
-            const p = document.createElement('p');
-            p.textContent = 'Товаров пока нет';
-            p.style.cssText = 'color:#666; margin-bottom:20px; font-size:1.1rem;';
-            
-            emptyDiv.appendChild(p);
+            emptyDiv.className = 'empty-state empty-products';
+            emptyDiv.innerHTML = `
+                <div class="empty-state-icon">📦</div>
+                <h3 class="empty-state-title">Товаров пока нет</h3>
+                <p class="empty-state-description">
+                    Каталог товаров пуст. Скоро здесь появятся новые товары!
+                </p>
+            `;
             productsContainer.appendChild(emptyDiv);
             return;
         }
@@ -2606,23 +2609,19 @@ class NeonShop {
 
         if (!this.cart.length) {
             const emptyDiv = document.createElement('div');
-            emptyDiv.className = 'empty-cart';
-            emptyDiv.style.cssText = 'text-align:center; padding:40px 20px;';
-            
-            const p = document.createElement('p');
-            p.textContent = 'Корзина пуста';
-            p.style.cssText = 'color:#666; margin-bottom:15px; font-size:1.1rem;';
-            
-            const btn = document.createElement('button');
-            btn.textContent = 'Посмотреть товары';
-            btn.className = 'browse-products-btn';
-            btn.addEventListener('click', () => {
-                this.closeCartModal();
-                this.loadProducts();
-            });
-            
-            emptyDiv.appendChild(p);
-            emptyDiv.appendChild(btn);
+            emptyDiv.className = 'empty-state empty-cart';
+            emptyDiv.innerHTML = `
+                <div class="empty-state-icon empty-cart-icon">🛒</div>
+                <h3 class="empty-state-title">Корзина пуста</h3>
+                <p class="empty-state-description">
+                    Добавьте товары в корзину, чтобы оформить заказ
+                </p>
+                <div class="empty-state-action">
+                    <button class="browse-products-btn" onclick="shop.closeCartModal(); shop.loadProducts();">
+                        Посмотреть товары
+                    </button>
+                </div>
+            `;
             if (cartItems) cartItems.appendChild(emptyDiv);
             if (cartTotalModal) cartTotalModal.textContent = '0 ₽';
             return;
@@ -4016,19 +4015,99 @@ class NeonShop {
         this.closeProfileModal();
     }
 
-    async loadProducts() {
+    renderSkeletonProducts(count = 6) {
         const productsContainer = document.getElementById('products');
         if (!productsContainer) return;
         
-        productsContainer.innerHTML = '<div class="loading">Загрузка товаров...</div>';
+        productsContainer.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            const skeleton = document.createElement('div');
+            skeleton.className = 'skeleton-product';
+            skeleton.innerHTML = `
+                <div class="skeleton skeleton-image"></div>
+                <div class="skeleton-content">
+                    <div class="skeleton skeleton-title"></div>
+                    <div class="skeleton skeleton-description"></div>
+                    <div class="skeleton skeleton-description"></div>
+                    <div class="skeleton-footer">
+                        <div class="skeleton skeleton-price"></div>
+                    </div>
+                    <div class="skeleton skeleton-button"></div>
+                </div>
+            `;
+            productsContainer.appendChild(skeleton);
+        }
+    }
+
+    async loadProducts(page = 1, useCache = true) {
+        const productsContainer = document.getElementById('products');
+        if (!productsContainer) return;
+        
+        // Константы для кэширования
+        const PRODUCTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
+        const CACHE_KEY = 'products_cache';
+        const CACHE_TIMESTAMP_KEY = 'products_cache_timestamp';
+        
+        // Проверяем кэш на клиенте
+        if (useCache && page === 1) {
+            try {
+                const cached = localStorage.getItem(CACHE_KEY);
+                const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+                
+                if (cached && timestamp && Date.now() - parseInt(timestamp) < PRODUCTS_CACHE_TTL_MS) {
+                    const cachedData = JSON.parse(cached);
+                    this.products = cachedData.products || cachedData; // Поддержка старого формата
+                    this.currentPage = cachedData.page || 1;
+                    this.totalPages = cachedData.totalPages || 1;
+                    this.renderProducts();
+                    return; // Используем кэш
+                }
+            } catch (e) {
+                console.warn('Cache read error:', e);
+            }
+        }
+        
+        // Показываем skeleton loading вместо спиннера
+        this.renderSkeletonProducts(6);
         showLoadingIndicator();
 
         try {
-            const url = `${this.API_BASE_URL}/products`;
+            const url = `${this.API_BASE_URL}/products?page=${page}&limit=20`;
             const response = await safeFetch(url, { showLoading: false });
 
-            this.products = await response.json();
+            const data = await response.json();
+            
+            // Поддержка нового формата с пагинацией и старого формата
+            if (data.products) {
+                this.products = data.products;
+                this.currentPage = data.page || page;
+                this.totalPages = data.totalPages || 1;
+                this.totalProducts = data.total || data.products.length;
+            } else {
+                // Старый формат (массив товаров)
+                this.products = data;
+                this.currentPage = 1;
+                this.totalPages = 1;
+                this.totalProducts = data.length;
+            }
+            
+            // Сохраняем в кэш только первую страницу
+            if (page === 1) {
+                try {
+                    localStorage.setItem(CACHE_KEY, JSON.stringify({
+                        products: this.products,
+                        page: this.currentPage,
+                        totalPages: this.totalPages,
+                        total: this.totalProducts
+                    }));
+                    localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                } catch (e) {
+                    console.warn('Cache write error:', e);
+                }
+            }
+            
             this.renderProducts();
+            this.renderPagination();
             hideLoadingIndicator();
 
         } catch (error) {
@@ -4044,7 +4123,7 @@ class NeonShop {
             const retryBtn = document.createElement('button');
             retryBtn.className = 'retry-button';
             retryBtn.textContent = 'Повторить';
-            retryBtn.addEventListener('click', () => this.loadProducts());
+            retryBtn.addEventListener('click', () => this.loadProducts(page, false));
             
             errorDiv.appendChild(errorP);
             errorDiv.appendChild(retryBtn);
@@ -4052,6 +4131,55 @@ class NeonShop {
             productsContainer.appendChild(errorDiv);
             this.showToast(error.message || 'Ошибка загрузки товаров', 'error');
         }
+    }
+    
+    renderPagination() {
+        if (!this.totalPages || this.totalPages <= 1) return;
+        
+        const productsContainer = document.getElementById('products');
+        if (!productsContainer) return;
+        
+        // Удаляем старую пагинацию если есть
+        const oldPagination = document.getElementById('products-pagination');
+        if (oldPagination) oldPagination.remove();
+        
+        const pagination = document.createElement('div');
+        pagination.id = 'products-pagination';
+        pagination.className = 'products-pagination';
+        pagination.style.cssText = 'display: flex; justify-content: center; align-items: center; gap: 10px; margin: 30px 0; flex-wrap: wrap;';
+        
+        // Кнопка "Назад"
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '← Назад';
+        prevBtn.className = 'pagination-btn';
+        prevBtn.disabled = this.currentPage === 1;
+        prevBtn.addEventListener('click', () => {
+            if (this.currentPage > 1) {
+                this.loadProducts(this.currentPage - 1, false);
+            }
+        });
+        
+        // Номера страниц
+        const pageInfo = document.createElement('span');
+        pageInfo.textContent = `Страница ${this.currentPage} из ${this.totalPages}`;
+        pageInfo.style.cssText = 'color: var(--text-secondary); font-weight: 600;';
+        
+        // Кнопка "Вперед"
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Вперед →';
+        nextBtn.className = 'pagination-btn';
+        nextBtn.disabled = this.currentPage >= this.totalPages;
+        nextBtn.addEventListener('click', () => {
+            if (this.currentPage < this.totalPages) {
+                this.loadProducts(this.currentPage + 1, false);
+            }
+        });
+        
+        pagination.appendChild(prevBtn);
+        pagination.appendChild(pageInfo);
+        pagination.appendChild(nextBtn);
+        
+        productsContainer.appendChild(pagination);
     }
 
     addToCart(id) {
@@ -4152,15 +4280,38 @@ class NeonShop {
     renderOrders(orders) {
         const ordersList = document.getElementById('orders-list');
         if (!ordersList) return;
+        
+        ordersList.innerHTML = '';
+        
+        if (!orders || orders.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'empty-state empty-orders';
+            emptyDiv.innerHTML = `
+                <div class="empty-state-icon">📋</div>
+                <h3 class="empty-state-title">Заказов пока нет</h3>
+                <p class="empty-state-description">
+                    Когда вы оформите заказ, он появится здесь
+                </p>
+            `;
+            ordersList.appendChild(emptyDiv);
+            return;
+        }
+        if (!ordersList) return;
 
         // Очищаем список перед рендерингом
         ordersList.innerHTML = '';
 
         if (!orders || orders.length === 0) {
-            const emptyP = document.createElement('p');
-            emptyP.textContent = 'Заказов пока нет';
-            emptyP.style.cssText = 'color:#666; text-align:center; padding:20px;';
-            ordersList.appendChild(emptyP);
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'empty-state empty-orders';
+            emptyDiv.innerHTML = `
+                <div class="empty-state-icon">📋</div>
+                <h3 class="empty-state-title">Заказов пока нет</h3>
+                <p class="empty-state-description">
+                    Когда вы оформите заказ, он появится здесь
+                </p>
+            `;
+            ordersList.appendChild(emptyDiv);
             return;
         }
 

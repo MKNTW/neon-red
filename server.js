@@ -1,6 +1,7 @@
 // server.js - Бэкенд для NEON RED магазина с админ-панелью
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
@@ -17,6 +18,8 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 // Middleware
+// Сжатие ответов для улучшения производительности
+app.use(compression());
 app.use(cors({
     origin: [
         'https://shop.mkntw.xyz',
@@ -48,11 +51,49 @@ if (!RESEND_API_KEY) {
 }
 const resend = new Resend(RESEND_API_KEY);
 
+// === КОНСТАНТЫ ===
+const RESEND_COOLDOWN_MS = 60 * 1000; // 60 секунд между повторными отправками
+const CODE_EXPIRY_MS = 10 * 60 * 1000; // 10 минут срок действия кода
+const TOKEN_EXPIRY = '7d'; // 7 дней срок действия токена
+const CODE_LENGTH = 6; // Длина кода подтверждения
+const BCRYPT_SALT_ROUNDS = 10;
+const PRODUCTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
+const PRODUCTS_PER_PAGE = 20;
+
+const productsCache = {
+    data: null,
+    timestamp: null,
+    featured: null,
+    featuredTimestamp: null
+};
+
+function getCachedProducts(featured = false) {
+    const cache = featured ? productsCache.featured : productsCache.data;
+    const timestamp = featured ? productsCache.featuredTimestamp : productsCache.timestamp;
+    
+    if (cache && timestamp && Date.now() - timestamp < PRODUCTS_CACHE_TTL_MS) {
+        return cache;
+    }
+    return null;
+}
+
+function setCachedProducts(products, featured = false) {
+    if (featured) {
+        productsCache.featured = products;
+        productsCache.featuredTimestamp = Date.now();
+    } else {
+        productsCache.data = products;
+        productsCache.timestamp = Date.now();
+    }
+}
+
 // === ФУНКЦИИ ДЛЯ EMAIL ПОДТВЕРЖДЕНИЯ ===
 
 // Генерация 6-значного кода
 function generateCode() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    const min = Math.pow(10, CODE_LENGTH - 1);
+    const max = Math.pow(10, CODE_LENGTH) - 1;
+    return Math.floor(min + Math.random() * (max - min + 1)).toString();
 }
 
 // Отправка кода подтверждения на email
@@ -190,8 +231,7 @@ app.post('/api/register', async (req, res) => {
             if (typeof password !== 'string' || password.length < 6 || password.length > 100) {
                 return res.status(400).json({ error: 'Пароль должен быть от 6 до 100 символов' });
             }
-            const saltRounds = 10;
-            passwordHash = await bcrypt.hash(password, saltRounds);
+            passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
         } else {
             // Создаём временный пароль, который нужно будет изменить
             const saltRounds = 10;
@@ -322,7 +362,7 @@ app.post('/api/register', async (req, res) => {
                     user_id: user.id,
                     email: cleanEmail,
                     code_hash: codeHash,
-                    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 минут
+                    expires_at: new Date(Date.now() + CODE_EXPIRY_MS).toISOString(),
                     last_sent_at: new Date().toISOString()
                 }]);
 
@@ -353,7 +393,7 @@ app.post('/api/register', async (req, res) => {
                 isAdmin: user.is_admin 
             },
             JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: TOKEN_EXPIRY }
         );
 
         res.status(201).json({
@@ -472,8 +512,8 @@ app.post('/api/send-email-code', async (req, res) => {
 
         if (lastTemp && lastTemp.last_sent_at) {
             const diff = Date.now() - new Date(lastTemp.last_sent_at).getTime();
-            if (diff < 60000) {
-                const secondsLeft = Math.ceil((60000 - diff) / 1000);
+            if (diff < RESEND_COOLDOWN_MS) {
+                const secondsLeft = Math.ceil((RESEND_COOLDOWN_MS - diff) / 1000);
                 return res.status(429).json({
                     error: 'Подождите перед повторной отправкой',
                     message: `Подождите ${secondsLeft} секунд перед повторной отправкой`
@@ -736,7 +776,7 @@ app.post('/api/confirm-email', async (req, res) => {
                 isAdmin: user.is_admin || false
             },
             JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: TOKEN_EXPIRY }
         );
 
         // Получаем обновлённые данные пользователя
@@ -846,8 +886,8 @@ app.post('/api/resend-code', async (req, res) => {
 
         if (last && last.last_sent_at) {
             const diff = Date.now() - new Date(last.last_sent_at).getTime();
-            if (diff < 60000) {
-                const secondsLeft = Math.ceil((60000 - diff) / 1000);
+            if (diff < RESEND_COOLDOWN_MS) {
+                const secondsLeft = Math.ceil((RESEND_COOLDOWN_MS - diff) / 1000);
                 return res.status(429).json({
                     error: 'Подождите перед повторной отправкой',
                     message: `Подождите ${secondsLeft} секунд перед повторной отправкой`
@@ -998,7 +1038,7 @@ app.post('/api/login', async (req, res) => {
                 isAdmin: user.is_admin 
             },
             JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: TOKEN_EXPIRY }
         );
 
         res.json({
@@ -1111,7 +1151,7 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
                 // Можно добавить предупреждение, но не блокировать
             }
             
-            const passwordHash = await bcrypt.hash(password, 10);
+            const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
             updates.password_hash = passwordHash;
         }
         
@@ -1187,8 +1227,8 @@ app.post('/api/profile/change-email', authenticateToken, async (req, res) => {
 
         if (lastCode && lastCode.last_sent_at) {
             const diff = Date.now() - new Date(lastCode.last_sent_at).getTime();
-            if (diff < 60000) {
-                const secondsLeft = Math.ceil((60000 - diff) / 1000);
+            if (diff < RESEND_COOLDOWN_MS) {
+                const secondsLeft = Math.ceil((RESEND_COOLDOWN_MS - diff) / 1000);
                 return res.status(429).json({
                     error: 'Подождите перед повторной отправкой',
                     message: `Подождите ${secondsLeft} секунд перед повторной отправкой`
@@ -1386,8 +1426,8 @@ app.post('/api/forgot-password', async (req, res) => {
         
         if (lastCode && lastCode.last_sent_at) {
             const diff = Date.now() - new Date(lastCode.last_sent_at).getTime();
-            if (diff < 60000) {
-                const secondsLeft = Math.ceil((60000 - diff) / 1000);
+            if (diff < RESEND_COOLDOWN_MS) {
+                const secondsLeft = Math.ceil((RESEND_COOLDOWN_MS - diff) / 1000);
                 return res.status(429).json({
                     error: 'Подождите перед повторной отправкой',
                     message: `Подождите ${secondsLeft} секунд перед повторной отправкой`
@@ -1513,7 +1553,7 @@ app.post('/api/reset-password', async (req, res) => {
                 isAdmin: updatedUser.is_admin 
             },
             JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: TOKEN_EXPIRY }
         );
         
         res.json({
@@ -1795,17 +1835,40 @@ app.delete('/api/admin/categories/:id', authenticateToken, authenticateAdmin, as
 
 // === ТОВАРЫ ===
 
-// Получить все товары
+// Получить все товары (с кэшированием и пагинацией)
 app.get('/api/products', async (req, res) => {
     try {
-        const { featured } = req.query;
-        let query = supabase.from('products').select('*');
+        const { featured, page = 1, limit = PRODUCTS_PER_PAGE } = req.query;
+        const isFeatured = featured === 'true';
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const offset = (pageNum - 1) * limitNum;
 
-        if (featured === 'true') {
+        // Проверяем кэш
+        const cached = getCachedProducts(isFeatured);
+        if (cached && pageNum === 1 && limitNum === PRODUCTS_PER_PAGE) {
+            // Возвращаем из кэша только если это первая страница с дефолтным лимитом
+            return res.json({
+                products: cached.slice(0, limitNum),
+                total: cached.length,
+                page: pageNum,
+                limit: limitNum,
+                totalPages: Math.ceil(cached.length / limitNum),
+                cached: true
+            });
+        }
+
+        let query = supabase.from('products').select('*', { count: 'exact' });
+
+        if (isFeatured) {
             query = query.eq('featured', true);
         }
 
-        const { data: products, error } = await query.order('created_at', { ascending: false });
+        // Применяем пагинацию
+        query = query.range(offset, offset + limitNum - 1);
+        query = query.order('created_at', { ascending: false });
+
+        const { data: products, error, count } = await query;
 
         if (error) throw error;
 
@@ -1845,7 +1908,45 @@ app.get('/api/products', async (req, res) => {
             };
         });
 
-        res.json(productsWithImages);
+        // Обновляем кэш только для первой страницы без пагинации
+        if (pageNum === 1 && limitNum === PRODUCTS_PER_PAGE) {
+            // Получаем все товары для кэша
+            const { data: allProducts } = await supabase
+                .from('products')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (allProducts) {
+                const allWithImages = allProducts.map(product => {
+                    let imageUrl = null;
+                    if (product.image_url && product.image_url.trim() !== '' && product.image_url.trim().startsWith('http')) {
+                        imageUrl = product.image_url.trim();
+                    } else if (product.image_path && product.image_path.trim() !== '') {
+                        const imagePath = product.image_path.trim();
+                        let cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+                        if (cleanPath.includes('storage/v1/object/public/')) {
+                            const match = cleanPath.match(/storage\/v1\/object\/public\/[^\/]+\/(.+)$/);
+                            if (match) cleanPath = match[1];
+                        }
+                        if (!cleanPath.startsWith('products/') && !cleanPath.startsWith('avatars/')) {
+                            cleanPath = `products/${cleanPath}`;
+                        }
+                        imageUrl = `${supabaseUrl}/storage/v1/object/public/product-images/${cleanPath}`;
+                    }
+                    return { ...product, image_url: imageUrl };
+                });
+                setCachedProducts(allWithImages, isFeatured);
+            }
+        }
+
+        res.json({
+            products: productsWithImages,
+            total: count || productsWithImages.length,
+            page: pageNum,
+            limit: limitNum,
+            totalPages: Math.ceil((count || productsWithImages.length) / limitNum),
+            cached: false
+        });
 
     } catch (error) {
         console.error('Products error:', error);
