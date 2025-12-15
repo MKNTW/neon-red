@@ -117,31 +117,36 @@ export class CartModule {
             total += itemTotal;
 
             const div = document.createElement('div');
-            div.className = 'cart-item';
+            div.className = 'cart-item profile-field';
             div.setAttribute('role', 'listitem');
 
+            const fieldContent = document.createElement('div');
+            fieldContent.className = 'profile-field-content';
+            fieldContent.style.cssText = 'align-items: flex-start; gap: 15px;';
+            
             const img = document.createElement('img');
             img.src = item.image_url || 'https://via.placeholder.com/80';
             img.alt = escapeAttr(item.title);
             img.loading = 'lazy';
-            img.width = 70;
-            img.height = 70;
+            img.style.cssText = 'width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 2px solid var(--neon-red); flex-shrink: 0;';
             img.onerror = function() { this.src = 'https://via.placeholder.com/80'; };
             
             const content = document.createElement('div');
             content.className = 'cart-item-content';
+            content.style.cssText = 'flex: 1; min-width: 0;';
             
             const h4 = document.createElement('h4');
+            h4.className = 'profile-value';
+            h4.style.cssText = 'margin: 0 0 8px 0; font-size: 1rem; font-weight: 600;';
             h4.textContent = item.title;
             
             const p = document.createElement('p');
+            p.style.cssText = 'margin: 0 0 8px 0; color: var(--text-secondary); font-size: 0.9rem;';
             p.textContent = `${parseFloat(item.price).toFixed(2)} ₽ × ${item.quantity} = ${itemTotal.toFixed(2)} ₽`;
-            
-            content.appendChild(h4);
-            content.appendChild(p);
             
             const controls = document.createElement('div');
             controls.className = 'cart-item-controls';
+            controls.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 8px;';
             
             const removeOneBtn = document.createElement('button');
             removeOneBtn.className = 'remove-one';
@@ -171,9 +176,14 @@ export class CartModule {
             controls.appendChild(addOneBtn);
             controls.appendChild(removeBtn);
             
-            div.appendChild(img);
-            div.appendChild(content);
-            div.appendChild(controls);
+            content.appendChild(h4);
+            content.appendChild(p);
+            content.appendChild(controls);
+            
+            fieldContent.appendChild(img);
+            fieldContent.appendChild(content);
+            
+            div.appendChild(fieldContent);
 
             cartItems.appendChild(div);
         });

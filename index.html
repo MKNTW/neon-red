@@ -464,17 +464,25 @@
 
     <!-- Модальное окно корзины -->
     <div id="cart-modal" class="modal" role="dialog" aria-labelledby="cart-title" aria-hidden="true">
-        <div class="modal-content">
-            <div class="cart-header">
+        <div class="modal-content profile-modal-content">
+            <button class="close" onclick="closeCartModal()">×</button>
+            <div class="profile-header">
                 <h2 id="cart-title">Ваша корзина</h2>
-                <button class="close" onclick="closeCartModal()">×</button>
             </div>
-            <div id="cart-items"></div>
-            <div class="cart-footer">
-                <p>Итого: <strong id="cart-total-modal">0 ₽</strong></p>
-                <div class="cart-buttons">
-                    <button id="clear-cart" class="secondary-btn">Очистить</button>
-                    <button id="checkout" onclick="checkout()">Оформить заказ</button>
+            <div id="profile-info" class="profile-info" style="padding-top: 0;">
+                <div class="profile-section">
+                    <div id="cart-items"></div>
+                </div>
+                <div class="profile-section">
+                    <div class="profile-field" style="background: rgba(255, 0, 51, 0.1); border: 2px solid var(--neon-red);">
+                        <div class="profile-field-content" style="flex-direction: column; align-items: center; gap: 15px;">
+                            <p style="margin: 0; font-size: 1.2rem; color: var(--text-primary);">Итого: <strong id="cart-total-modal" style="color: var(--neon-red); font-size: 1.5rem; text-shadow: 0 0 10px rgba(255, 0, 51, 0.5);">0 ₽</strong></p>
+                            <div class="cart-buttons" style="display: flex; gap: 12px; width: 100%;">
+                                <button id="clear-cart" class="secondary-btn" style="flex: 1; min-height: 50px;">Очистить</button>
+                                <button id="checkout" onclick="checkout()" class="primary-btn" style="flex: 1; min-height: 50px;">Оформить заказ</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

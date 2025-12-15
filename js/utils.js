@@ -60,74 +60,124 @@ export function hideLoadingIndicator() {
  * @throws {Error} - Ошибка при запросе
  */
 export async function safeFetch(url, options = {}) {
-    const FETCH_TIMEOUT_MS = 30 * 1000; // 30 секунд таймаут
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const FETCH_TIMEOUT_MS = 60 * 1000; // 60 секунд таймаут для слабого соединения
+    const MAX_RETRIES = 3; // Максимум 3 попытки
+    const RETRY_DELAY_MS = 1000; // Задержка между попытками
+    
+    let lastError = null;
     
     // Показываем индикатор загрузки только для не-GET запросов или если явно указано
     const showLoading = options.method && options.method !== 'GET' || options.showLoading === true;
-    if (showLoading) {
-        showLoadingIndicator();
-    }
     
     // Логирование для отладки
     if (options.method && options.method !== 'GET') {
         console.log(`[safeFetch] ${options.method} ${url}`);
     }
     
-    try {
-        const response = await fetch(url, {
-            ...options,
-            signal: controller.signal,
-            credentials: 'include'
-        });
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         
-        clearTimeout(timeoutId);
+        if (showLoading && attempt === 0) {
+            showLoadingIndicator();
+        }
         
-        // Если ответ не OK, пытаемся получить сообщение об ошибке
-        if (!response.ok) {
-            let errorMessage = `Ошибка ${response.status}`;
-            let errorData = null;
-            try {
-                errorData = await response.json();
-                errorMessage = errorData.error || errorData.message || errorMessage;
-            } catch (e) {
-                // Если не удалось распарсить JSON, используем статус
-                if (response.status === 401) errorMessage = 'Требуется авторизация';
-                else if (response.status === 403) errorMessage = 'Доступ запрещен';
-                else if (response.status === 404) errorMessage = `Ресурс не найден: ${url}`;
-                else if (response.status === 400) errorMessage = 'Неверный запрос';
-                else if (response.status === 409) errorMessage = 'Конфликт данных';
-                else if (response.status === 429) errorMessage = 'Слишком много запросов';
-                else if (response.status === 500) errorMessage = 'Ошибка сервера';
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal,
+                credentials: 'include',
+                // Добавляем keepalive для лучшей работы на слабом соединении
+                keepalive: true
+            });
+            
+            clearTimeout(timeoutId);
+            
+            // Если ответ не OK, пытаемся получить сообщение об ошибке
+            if (!response.ok) {
+                let errorMessage = `Ошибка ${response.status}`;
+                let errorData = null;
+                try {
+                    errorData = await response.json();
+                    errorMessage = errorData.error || errorData.message || errorMessage;
+                } catch (e) {
+                    // Если не удалось распарсить JSON, используем статус
+                    if (response.status === 401) errorMessage = 'Требуется авторизация';
+                    else if (response.status === 403) errorMessage = 'Доступ запрещен';
+                    else if (response.status === 404) errorMessage = `Ресурс не найден: ${url}`;
+                    else if (response.status === 400) errorMessage = 'Неверный запрос';
+                    else if (response.status === 409) errorMessage = 'Конфликт данных';
+                    else if (response.status === 429) errorMessage = 'Слишком много запросов';
+                    else if (response.status === 500) errorMessage = 'Ошибка сервера';
+                }
+                
+                // Для ошибок сервера (5xx) или сетевых ошибок - повторяем попытку
+                // Для клиентских ошибок (4xx) - не повторяем
+                if (response.status >= 500 || response.status === 0) {
+                    if (attempt < MAX_RETRIES - 1) {
+                        console.log(`[safeFetch] Retry ${attempt + 1}/${MAX_RETRIES} for ${url}`);
+                        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
+                        continue;
+                    }
+                }
+                
+                // Сохраняем данные ошибки для дальнейшей обработки
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.data = errorData;
+                error.url = url;
+                
+                console.error(`[safeFetch] Error ${response.status} for ${url}:`, errorMessage);
+                throw error;
             }
             
-            // Сохраняем данные ошибки для дальнейшей обработки
-            const error = new Error(errorMessage);
-            error.status = response.status;
-            error.data = errorData;
-            error.url = url;
+            if (showLoading) {
+                hideLoadingIndicator();
+            }
             
-            console.error(`[safeFetch] Error ${response.status} for ${url}:`, errorMessage);
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            
+            // Для сетевых ошибок и таймаутов - повторяем попытку
+            if ((error.name === 'AbortError' || 
+                 (error instanceof TypeError && error.message.includes('fetch'))) &&
+                attempt < MAX_RETRIES - 1) {
+                lastError = error;
+                console.log(`[safeFetch] Network error, retry ${attempt + 1}/${MAX_RETRIES} for ${url}`);
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
+                continue;
+            }
+            
+            // Если все попытки исчерпаны или это не сетевая ошибка
+            if (showLoading) {
+                hideLoadingIndicator();
+            }
+            
+            if (error.name === 'AbortError') {
+                throw new Error('Превышено время ожидания запроса. Проверьте подключение к интернету');
+            }
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+                console.error(`[safeFetch] Network error for ${url}:`, error);
+                throw new Error('Ошибка сети. Проверьте подключение к интернету');
+            }
             throw error;
         }
-        
-        return response;
-    } catch (error) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-            throw new Error('Превышено время ожидания запроса');
-        }
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-            console.error(`[safeFetch] Network error for ${url}:`, error);
-            throw new Error('Ошибка сети. Проверьте подключение к интернету');
-        }
-        throw error;
-    } finally {
-        if (showLoading) {
-            hideLoadingIndicator();
-        }
     }
+    
+    // Если все попытки исчерпаны
+    if (showLoading) {
+        hideLoadingIndicator();
+    }
+    
+    if (lastError) {
+        if (lastError.name === 'AbortError') {
+            throw new Error('Превышено время ожидания запроса. Проверьте подключение к интернету');
+        }
+        throw new Error('Ошибка сети после нескольких попыток. Проверьте подключение к интернету');
+    }
+    
+    throw new Error('Неизвестная ошибка при выполнении запроса');
 }
 
 /**

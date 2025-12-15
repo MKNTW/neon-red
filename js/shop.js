@@ -100,6 +100,9 @@ export class NeonShop {
             });
         }
 
+        // Настройка обработчиков Enter для всех форм
+        this.setupEnterKeyHandlers();
+
         // Обработчик загрузки аватара
         const avatarInput = document.getElementById('profile-avatar-upload');
         if (avatarInput) {
@@ -379,6 +382,184 @@ export class NeonShop {
     async loadAdminOrders() {
         return this.adminModule.loadAdminOrders();
     }
+
+    setupEnterKeyHandlers() {
+        // Используем делегирование событий для всех форм
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            
+            const target = e.target;
+            if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) return;
+            
+            // Предотвращаем стандартное поведение
+            e.preventDefault();
+            
+            // Форма входа
+            if (target.id === 'login-username') {
+                const loginPassword = document.getElementById('login-password');
+                if (loginPassword) {
+                    loginPassword.focus();
+                }
+                return;
+            }
+            
+            if (target.id === 'login-password') {
+                const loginForm = document.getElementById('login-form');
+                if (loginForm) {
+                    const submitBtn = loginForm.querySelector('button[type="submit"]');
+                    if (submitBtn) submitBtn.click();
+                }
+                return;
+            }
+
+            // Форма регистрации - шаг 1 (имя пользователя)
+            if (target.id === 'register-username') {
+                this.nextRegisterStep();
+                return;
+            }
+            
+            // Форма регистрации - шаг 2 (email)
+            if (target.id === 'register-email') {
+                this.nextRegisterStep();
+                return;
+            }
+            
+            // Форма регистрации - шаг 3 (код подтверждения)
+            if (target.id === 'register-code') {
+                this.confirmEmailCode();
+                return;
+            }
+            
+            // Форма регистрации - шаг 4 (полное имя)
+            if (target.id === 'register-fullname') {
+                this.nextRegisterStep();
+                return;
+            }
+            
+            // Форма регистрации - шаг 5 (пароль)
+            if (target.id === 'register-password') {
+                const registerPassword2 = document.getElementById('register-password2');
+                if (registerPassword2) {
+                    registerPassword2.focus();
+                }
+                return;
+            }
+            
+            if (target.id === 'register-password2') {
+                this.completeRegistrationWithPassword();
+                return;
+            }
+            
+            // Форма восстановления пароля - email
+            if (target.id === 'forgot-email') {
+                this.sendPasswordResetCode();
+                return;
+            }
+            
+            // Форма восстановления пароля - проверка пароля
+            if (target.id === 'verify-password') {
+                this.verifyPasswordForReset();
+                return;
+            }
+            
+            // Форма восстановления пароля - код
+            if (target.id === 'reset-code') {
+                this.verifyResetCode();
+                return;
+            }
+            
+            // Форма восстановления пароля - новый пароль
+            if (target.id === 'reset-password') {
+                const resetPassword2 = document.getElementById('reset-password2');
+                if (resetPassword2) {
+                    resetPassword2.focus();
+                }
+                return;
+            }
+            
+            if (target.id === 'reset-password2') {
+                this.confirmPasswordReset();
+                return;
+            }
+            
+            // Формы профиля
+            if (target.id === 'edit-username-input') {
+                saveProfileField('username');
+                return;
+            }
+            
+            if (target.id === 'edit-email-input') {
+                saveProfileField('email');
+                return;
+            }
+            
+            if (target.id === 'edit-fullname-input') {
+                saveProfileField('fullName');
+                return;
+            }
+            
+            if (target.id === 'edit-password-input') {
+                const password2 = document.getElementById('edit-password2-input');
+                if (password2) {
+                    password2.focus();
+                } else {
+                    saveProfileField('password');
+                }
+                return;
+            }
+            
+            if (target.id === 'edit-password2-input') {
+                saveProfileField('password');
+                return;
+            }
+            
+            // Админские формы
+            if (target.id === 'edit-product-title' || 
+                target.id === 'edit-product-price' || 
+                target.id === 'edit-product-quantity' ||
+                target.id === 'edit-product-image-url') {
+                const form = document.getElementById('edit-product-form');
+                const submitBtn = form?.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.click();
+                return;
+            }
+            
+            if (target.id === 'edit-product-description') {
+                // Для textarea - Shift+Enter = новая строка, Enter = submit
+                if (e.shiftKey) {
+                    // Разрешаем Shift+Enter для новой строки
+                    return;
+                }
+                const form = document.getElementById('edit-product-form');
+                const submitBtn = form?.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.click();
+                return;
+            }
+            
+            if (target.id === 'new-product-title' || 
+                target.id === 'new-product-price' || 
+                target.id === 'new-product-quantity' ||
+                target.id === 'new-product-image') {
+                const form = document.getElementById('add-product-form');
+                const submitBtn = form?.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.click();
+                return;
+            }
+            
+            if (target.id === 'new-product-description') {
+                // Для textarea - Shift+Enter = новая строка, Enter = submit
+                if (e.shiftKey) {
+                    // Разрешаем Shift+Enter для новой строки
+                    return;
+                }
+                const form = document.getElementById('add-product-form');
+                const submitBtn = form?.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.click();
+                return;
+            }
+        });
+    }
+
 }
 
 // Экспортируем для использования в других модулях

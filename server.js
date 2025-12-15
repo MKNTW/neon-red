@@ -632,11 +632,18 @@ app.post('/api/confirm-email', async (req, res) => {
         const cleanCode = code.trim();
 
         // Находим пользователя (нужны все поля для создания токена)
-        const { data: user, error: userError } = await supabase
+        // Ищем по email, но также проверяем все пользователи с этим email (может быть несколько)
+        const { data: users, error: userError } = await supabase
             .from('users')
             .select('id, username, email, email_verified, is_admin')
             .eq('email', cleanEmail)
-            .maybeSingle();
+            .order('created_at', { ascending: false });
+            
+        let user = null;
+        if (users && users.length > 0) {
+            // Берем первого пользователя с неподтвержденным email
+            user = users.find(u => !u.email_verified) || users[0];
+        }
 
         if (userError) {
             console.error('[confirm-email] Error finding user:', userError);
@@ -648,7 +655,11 @@ app.post('/api/confirm-email', async (req, res) => {
         }
 
         if (!user) {
-            return res.status(404).json({ error: 'Пользователь не найден' });
+            console.error('[confirm-email] User not found for email:', cleanEmail);
+            return res.status(404).json({ 
+                error: 'Пользователь не найден',
+                message: 'Пользователь с таким email не найден. Убедитесь, что вы правильно ввели email при регистрации.'
+            });
         }
 
         if (user.email_verified) {
