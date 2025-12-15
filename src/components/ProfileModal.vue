@@ -141,7 +141,7 @@ import { useAuth } from '../composables/useAuth'
 import { useApi } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 
-defineProps({
+const props = defineProps({
   modelValue: {
     type: Boolean,
     default: false
@@ -149,20 +149,6 @@ defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
-
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  }
-})
-
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  }
-})
 
 const { user, logout, saveAuth } = useAuth()
 const { request } = useApi()

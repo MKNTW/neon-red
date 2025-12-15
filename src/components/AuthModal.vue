@@ -40,11 +40,9 @@ defineProps({
   }
 })
 
-defineEmits(['update:modelValue', 'open-forgot-password', 'success'])
+const emit = defineEmits(['update:modelValue', 'open-forgot-password', 'success'])
 
 const isLogin = ref(true)
-
-const emit = defineEmits(['update:modelValue', 'open-forgot-password', 'success'])
 
 function handleLoginSuccess() {
   emit('success')

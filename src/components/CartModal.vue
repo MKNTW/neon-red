@@ -123,8 +123,6 @@ function formatPrice(price) {
   return parseFloat(price).toFixed(2)
 }
 
-const emit = defineEmits(['update:modelValue', 'close', 'checkout'])
-
 async function handleCheckout() {
   const address = prompt('Введите адрес доставки:')
   if (!address || address.trim() === '') {
