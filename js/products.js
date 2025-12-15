@@ -218,10 +218,12 @@ export class ProductsModule {
             
             const img = document.createElement('img');
             img.className = 'product-image-img';
-            img.alt = escapeAttr(product.title);
+            img.alt = escapeAttr(product.title) || 'Изображение товара';
             img.loading = 'lazy';
+            img.decoding = 'async';
             img.width = 300;
             img.height = 220;
+            img.setAttribute('aria-label', `Изображение товара: ${escapeAttr(product.title)}`);
             
             const imageFallback = document.createElement('span');
             imageFallback.className = 'product-image-text';

@@ -5,6 +5,7 @@ import { CartModule } from './cart.js';
 import { AuthModule } from './auth.js';
 import { ProfileModule } from './profile.js';
 import { AdminModule } from './admin.js';
+import { setupRealtimeValidation, setupLoginValidation } from './realtime-validation.js';
 
 export class NeonShop {
     constructor() {

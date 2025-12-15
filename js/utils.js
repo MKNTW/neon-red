@@ -315,3 +315,48 @@ export function getApiBaseUrl() {
     }
 }
 
+/**
+ * Показать ошибку поля формы
+ * @param {string} errorId - ID элемента ошибки
+ * @param {string} message - Сообщение об ошибке
+ */
+export function showFieldError(errorId, message) {
+    const errorEl = document.getElementById(errorId);
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+        errorEl.setAttribute('role', 'alert');
+        errorEl.setAttribute('aria-live', 'polite');
+    }
+    
+    // Устанавливаем aria-invalid для связанного поля
+    const inputId = errorId.replace('-error', '');
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.setAttribute('aria-invalid', 'true');
+        input.setAttribute('aria-describedby', errorId);
+    }
+}
+
+/**
+ * Скрыть ошибку поля формы
+ * @param {string} errorId - ID элемента ошибки
+ */
+export function hideFieldError(errorId) {
+    const errorEl = document.getElementById(errorId);
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+        errorEl.removeAttribute('role');
+        errorEl.removeAttribute('aria-live');
+    }
+    
+    // Убираем aria-invalid для связанного поля
+    const inputId = errorId.replace('-error', '');
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.setAttribute('aria-invalid', 'false');
+        input.removeAttribute('aria-describedby');
+    }
+}
+

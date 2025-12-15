@@ -135,6 +135,11 @@ export class AdminModule {
             const response = await safeFetch(`${this.shop.API_BASE_URL}/admin/products/${id}`, {
                 headers: { 'Authorization': `Bearer ${this.shop.token}` }
             });
+            
+            if (!response || !response.ok) {
+                throw new Error('Ошибка загрузки товара');
+            }
+            
             const product = await response.json();
             
             document.getElementById('edit-product-id').value = product.id;
@@ -241,6 +246,17 @@ export class AdminModule {
                     body: formData
                 });
                 
+                if (!uploadResponse || !uploadResponse.ok) {
+                    let errorMsg = 'Ошибка загрузки изображения';
+                    try {
+                        const errorData = await uploadResponse.json();
+                        errorMsg = errorData.error || errorData.message || errorMsg;
+                    } catch (e) {
+                        // Игнорируем ошибку парсинга
+                    }
+                    throw new Error(errorMsg);
+                }
+                
                 const uploadData = await uploadResponse.json();
                 
                 if (uploadData.image_url) {
@@ -279,6 +295,17 @@ export class AdminModule {
                     image_url: finalImageUrl
                 })
             });
+
+            if (!response || !response.ok) {
+                let errorMsg = 'Ошибка обновления товара';
+                try {
+                    const errorData = await response.json();
+                    errorMsg = errorData.error || errorData.message || errorMsg;
+                } catch (e) {
+                    // Игнорируем ошибку парсинга
+                }
+                throw new Error(errorMsg);
+            }
 
             showToast('Товар обновлен', 'success');
             this.closeEditProductModal();

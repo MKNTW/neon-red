@@ -133,14 +133,27 @@ export class AuthModule {
                 headers: { 'Authorization': `Bearer ${this.shop.token}` }
             });
 
+            if (!response || !response.ok) {
+                // Если токен невалиден, не выходим автоматически - сохраняем сессию
+                // Пользователь останется залогинен до явного выхода
+                console.warn('Token validation failed, but keeping session');
+                return false;
+            }
+
             const data = await response.json();
-            this.shop.user = data.user;
+            if (data.user) {
+                this.shop.user = data.user;
+                // Обновляем данные в localStorage
+                localStorage.setItem('user', JSON.stringify(data.user));
+                localStorage.setItem('token', this.shop.token);
+                return true;
+            }
             
-            return true;
+            return false;
 
         } catch (error) {
-            console.error('Token validation error:', error);
-            this.logout();
+            // При ошибке сети не выходим автоматически - сохраняем сессию
+            console.warn('Token validation error (network), but keeping session:', error);
             return false;
         }
     }
@@ -1092,28 +1105,23 @@ export class AuthModule {
                 return false;
             }
             
-            // Если несколько аккаунтов - показываем форму ввода пароля
+            // Всегда показываем форму ввода пароля после email (как в регистрации шаг 3)
+            this.pendingResetEmail = email.toLowerCase();
+            
             if (data.accounts && data.accounts.length > 1) {
-                this.pendingResetEmail = email.toLowerCase();
+                // Несколько аккаунтов - сохраняем список
                 this.pendingResetAccounts = data.accounts;
-                this.showVerifyPasswordForm();
-                return true;
-            }
-            
-            // Если один аккаунт - сразу отправляем код
-            if (data.success || data.accounts?.length === 1) {
-                this.pendingResetEmail = email.toLowerCase();
-                this.pendingResetUserId = data.accounts?.[0]?.id || data.userId;
-                this.showVerifyCodeForm();
-                return true;
-            }
-            
-            if (data.success && data.userId) {
-                this.pendingResetEmail = email.toLowerCase();
+            } else if (data.accounts?.length === 1) {
+                // Один аккаунт - сохраняем ID
+                this.pendingResetUserId = data.accounts[0].id;
+            } else if (data.userId) {
+                // Один аккаунт через userId
                 this.pendingResetUserId = data.userId;
-                this.showVerifyCodeForm();
-                return true;
             }
+            
+            // Всегда показываем форму ввода пароля
+            this.showVerifyPasswordForm();
+            return true;
             
             showToast('Ошибка: неожиданный ответ сервера', 'error');
             return false;
@@ -1143,12 +1151,24 @@ export class AuthModule {
         if (verifyCodeForm) verifyCodeForm.style.display = 'none';
         if (resetForm) resetForm.style.display = 'none';
         if (title) title.textContent = 'Введите пароль';
-        if (subtitle) subtitle.textContent = 'Для выбора аккаунта введите пароль';
+        if (subtitle) subtitle.textContent = 'Для подтверждения аккаунта';
+        
+        // Отображаем email
+        const emailDisplay = document.getElementById('reset-email-display-password');
+        if (emailDisplay && this.pendingResetEmail) {
+            emailDisplay.textContent = this.pendingResetEmail;
+        }
         
         const passwordInput = document.getElementById('verify-password');
         if (passwordInput) {
             passwordInput.value = '';
             setTimeout(() => passwordInput.focus(), 100);
+        }
+        
+        const errorEl = document.getElementById('verify-password-error');
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.style.display = 'none';
         }
     }
     
@@ -1172,38 +1192,99 @@ export class AuthModule {
             return false;
         }
         
-        if (!this.pendingResetAccounts || this.pendingResetAccounts.length === 0) {
-            showToast('Ошибка: аккаунты не найдены', 'error');
-            return false;
-        }
-        
         try {
             showLoadingIndicator();
             
-            // Проверяем пароль для каждого аккаунта
-            const matchedAccounts = [];
-            for (const account of this.pendingResetAccounts) {
+            let matchedAccounts = [];
+            
+            // Если есть pendingResetUserId (один аккаунт) - проверяем пароль для него
+            if (this.pendingResetUserId && (!this.pendingResetAccounts || this.pendingResetAccounts.length === 0)) {
+                // Нужно получить username для этого userId
                 try {
-                    const response = await safeFetch(`${this.shop.API_BASE_URL}/login`, {
+                    const userResponse = await safeFetch(`${this.shop.API_BASE_URL}/user/${this.pendingResetUserId}`, {
+                        headers: { 'Authorization': `Bearer ${this.shop.token}` }
+                    });
+                    if (userResponse.ok) {
+                        const userData = await userResponse.json();
+                        // Проверяем пароль через login
+                        const loginResponse = await safeFetch(`${this.shop.API_BASE_URL}/login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: userData.username || this.pendingResetEmail,
+                                password: password
+                            })
+                        });
+                        
+                        if (loginResponse.ok) {
+                            // Пароль верный - отправляем код
+                            this.verifiedPassword = password;
+                            hideLoadingIndicator();
+                            if (errorEl) {
+                                errorEl.textContent = '';
+                                errorEl.style.display = 'none';
+                            }
+                            this.showVerifyCodeForm();
+                            return true;
+                        }
+                    }
+                } catch (e) {
+                    // Ошибка проверки
+                }
+            } else if (this.pendingResetAccounts && this.pendingResetAccounts.length > 0) {
+                // Несколько аккаунтов - проверяем пароль для каждого
+                for (const account of this.pendingResetAccounts) {
+                    try {
+                        const response = await safeFetch(`${this.shop.API_BASE_URL}/login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: account.username,
+                                password: password
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            matchedAccounts.push(account);
+                        }
+                    } catch (e) {
+                        // Пароль не подходит для этого аккаунта
+                    }
+                }
+            } else {
+                // Пробуем проверить через email
+                try {
+                    const loginResponse = await safeFetch(`${this.shop.API_BASE_URL}/login`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            username: account.username,
+                            username: this.pendingResetEmail,
                             password: password
                         })
                     });
                     
-                    if (response.ok) {
-                        matchedAccounts.push(account);
+                    if (loginResponse.ok) {
+                        const loginData = await loginResponse.json();
+                        if (loginData.user) {
+                            this.pendingResetUserId = loginData.user.id;
+                            this.verifiedPassword = password;
+                            hideLoadingIndicator();
+                            if (errorEl) {
+                                errorEl.textContent = '';
+                                errorEl.style.display = 'none';
+                            }
+                            this.showVerifyCodeForm();
+                            return true;
+                        }
                     }
                 } catch (e) {
-                    // Пароль не подходит для этого аккаунта
+                    // Ошибка проверки
                 }
             }
             
             hideLoadingIndicator();
             
-            if (matchedAccounts.length === 0) {
+            if (matchedAccounts.length === 0 && !this.pendingResetUserId) {
                 if (errorEl) {
                     errorEl.textContent = 'Неверный пароль';
                     errorEl.style.display = 'block';
@@ -1227,9 +1308,20 @@ export class AuthModule {
             }
             
             // Если несколько - показываем выбор
-            this.pendingResetAccounts = matchedAccounts;
-            this.showAccountSelection(matchedAccounts);
-            return true;
+            if (matchedAccounts.length > 1) {
+                this.pendingResetAccounts = matchedAccounts;
+                this.showAccountSelection(matchedAccounts);
+                return true;
+            }
+            
+            // Если дошли сюда и есть pendingResetUserId - отправляем код
+            if (this.pendingResetUserId) {
+                this.showVerifyCodeForm();
+                return true;
+            }
+            
+            showToast('Ошибка: не удалось определить аккаунт', 'error');
+            return false;
             
         } catch (error) {
             hideLoadingIndicator();
@@ -1396,16 +1488,6 @@ export class AuthModule {
         try {
             showLoadingIndicator();
             
-            // Проверяем код через отдельный endpoint или через проверку кода
-            const { data: record } = await supabase
-                .from('email_verifications')
-                .select('*')
-                .eq('user_id', this.pendingResetUserId)
-                .eq('email', this.pendingResetEmail)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-            
             // Проверяем код через API reset-password с временным паролем
             // Сервер проверит код и вернет success, если код верный
             const response = await safeFetch(`${this.shop.API_BASE_URL}/reset-password`, {
@@ -1419,10 +1501,34 @@ export class AuthModule {
                 })
             });
             
-            const data = await response.json();
+            if (!response) {
+                hideLoadingIndicator();
+                const errorMsg = 'Ошибка: нет ответа от сервера';
+                showToast(errorMsg, 'error');
+                if (codeError) {
+                    codeError.textContent = errorMsg;
+                    codeError.style.display = 'block';
+                }
+                return false;
+            }
+            
+            let data;
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                hideLoadingIndicator();
+                const errorMsg = 'Ошибка: неверный ответ от сервера';
+                showToast(errorMsg, 'error');
+                if (codeError) {
+                    codeError.textContent = errorMsg;
+                    codeError.style.display = 'block';
+                }
+                return false;
+            }
+            
             hideLoadingIndicator();
             
-            if (!response.ok) {
+            if (!response.ok || !data.success) {
                 const errorMsg = data?.error || data?.message || 'Ошибка проверки кода';
                 showToast(errorMsg, 'error');
                 if (codeError) {

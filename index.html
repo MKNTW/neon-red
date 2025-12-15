@@ -40,11 +40,11 @@
             <form id="login-form" class="auth-form" style="display: block;">
                 <div class="input-group">
                     <label for="login-username">Имя пользователя или Email</label>
-                    <input type="text" id="login-username" placeholder="Введите имя пользователя или email" required autocomplete="username">
+                    <input type="text" id="login-username" placeholder="Введите имя пользователя или email" required autocomplete="username" aria-required="true" aria-invalid="false">
                 </div>
                 <div class="input-group">
                     <label for="login-password">Пароль</label>
-                    <input type="password" id="login-password" placeholder="Введите пароль" required autocomplete="current-password">
+                    <input type="password" id="login-password" placeholder="Введите пароль" required autocomplete="current-password" aria-required="true" aria-invalid="false">
                 </div>
                 <button type="submit" class="auth-btn primary-btn">Войти</button>
                 <div class="auth-switch">
@@ -90,8 +90,8 @@
                     </div>
                     <div class="input-group">
                         <label for="register-email">Email</label>
-                        <input type="email" id="register-email" placeholder="Введите email" required autocomplete="email">
-                        <div class="input-error" id="email-error"></div>
+                        <input type="email" id="register-email" placeholder="Введите email" required autocomplete="email" aria-required="true" aria-invalid="false" aria-describedby="email-error">
+                        <div class="input-error" id="email-error" role="alert" aria-live="polite"></div>
                     </div>
                     <div class="step-buttons">
                         <button type="button" class="auth-btn secondary-btn" onclick="shop.prevRegisterStep()">Назад</button>
@@ -115,8 +115,8 @@
                     <div class="input-group">
                         <label for="register-code">Код подтверждения</label>
                         <p style="color: #888; font-size: 14px; margin-bottom: 10px;">Мы отправили код подтверждения на <strong id="verification-email"></strong></p>
-                        <input type="text" id="register-code" placeholder="Введите 6-значный код" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code">
-                        <div class="input-error" id="code-error"></div>
+                        <input type="text" id="register-code" placeholder="Введите 6-значный код" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" aria-required="true" aria-invalid="false" aria-describedby="code-error">
+                        <div class="input-error" id="code-error" role="alert" aria-live="polite"></div>
                     </div>
                     <div class="step-buttons">
                         <button type="button" class="auth-btn secondary-btn" onclick="shop.prevRegisterStep()">Назад</button>
@@ -144,7 +144,7 @@
                     </div>
                     <div class="input-group">
                         <label for="register-fullname">Полное имя (необязательно)</label>
-                        <input type="text" id="register-fullname" placeholder="Введите полное имя" autocomplete="name">
+                        <input type="text" id="register-fullname" placeholder="Введите полное имя" autocomplete="name" aria-invalid="false">
                     </div>
                     <div class="step-buttons">
                         <button type="button" class="auth-btn secondary-btn" onclick="shop.prevRegisterStep()">Назад</button>
@@ -168,13 +168,13 @@
                     </div>
                     <div class="input-group">
                         <label for="register-password">Пароль</label>
-                        <input type="password" id="register-password" placeholder="Введите пароль (минимум 6 символов)" required autocomplete="new-password">
-                        <div class="password-hint">Минимум 6 символов</div>
+                        <input type="password" id="register-password" placeholder="Введите пароль (минимум 6 символов)" required autocomplete="new-password" aria-required="true" aria-invalid="false" aria-describedby="password-error password-hint">
+                        <div class="password-hint" id="password-hint">Минимум 6 символов</div>
                     </div>
                     <div class="input-group">
                         <label for="register-password2">Повторите пароль</label>
-                        <input type="password" id="register-password2" placeholder="Повторите пароль" required autocomplete="new-password">
-                        <div class="input-error" id="password-error"></div>
+                        <input type="password" id="register-password2" placeholder="Повторите пароль" required autocomplete="new-password" aria-required="true" aria-invalid="false" aria-describedby="password-error">
+                        <div class="input-error" id="password-error" role="alert" aria-live="polite"></div>
                     </div>
                     <div class="step-buttons">
                         <button type="button" class="auth-btn secondary-btn" onclick="shop.prevRegisterStep()">Назад</button>
@@ -512,14 +512,16 @@
 
             <!-- Форма ввода пароля для выбора аккаунта -->
             <div id="verify-password-form" class="auth-form" style="display: none;">
-                <p style="color: #888; margin-bottom: 15px; line-height: 1.5;">Найдено несколько аккаунтов с этим email. Введите пароль для выбора аккаунта:</p>
+                <p style="color: #888; font-size: 14px; margin-bottom: 10px;">Введите пароль для подтверждения аккаунта <strong id="reset-email-display-password" style="color: #ff0033;"></strong></p>
                 <div class="input-group">
                     <label for="verify-password">Пароль</label>
                     <input type="password" id="verify-password" placeholder="Введите пароль" required autocomplete="current-password">
                     <div class="input-error" id="verify-password-error"></div>
                 </div>
-                <button type="button" class="auth-btn primary-btn" onclick="shop.verifyPasswordForReset()">Продолжить</button>
-                <button type="button" class="auth-btn secondary-btn" onclick="shop.backToForgotPassword()" style="margin-top: 10px;">Назад</button>
+                <div class="step-buttons">
+                    <button type="button" class="auth-btn secondary-btn" onclick="shop.backToForgotPassword()">Назад</button>
+                    <button type="button" class="auth-btn primary-btn" onclick="shop.verifyPasswordForReset()">Продолжить</button>
+                </div>
             </div>
 
             <!-- Форма выбора аккаунта -->
@@ -531,19 +533,21 @@
 
             <!-- Форма подтверждения кода -->
             <div id="verify-code-form" class="auth-form" style="display: none;">
-                <p style="color: #888; margin-bottom: 15px; line-height: 1.5;">Код подтверждения отправлен на <strong id="reset-email-display" style="color: #ff0033;"></strong></p>
                 <div class="input-group">
                     <label for="reset-code">Код подтверждения</label>
+                    <p style="color: #888; font-size: 14px; margin-bottom: 10px;">Мы отправили код подтверждения на <strong id="reset-email-display" style="color: #ff0033;"></strong></p>
                     <input type="text" id="reset-code" placeholder="Введите 6-значный код" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code">
                     <div class="input-error" id="reset-code-error"></div>
                 </div>
-                <button type="button" class="auth-btn primary-btn" onclick="shop.verifyResetCode()">Подтвердить код</button>
-                <div class="email-resend-container" style="margin-top: 15px;">
-                    <button type="button" id="resend-reset-code-btn" class="profile-resend-btn" onclick="shop.resendResetCode()">
-                        <span>↻</span> Отправить код заново
+                <div class="step-buttons">
+                    <button type="button" class="auth-btn secondary-btn" onclick="shop.backToVerifyPassword()">Назад</button>
+                    <button type="button" class="auth-btn primary-btn" onclick="shop.verifyResetCode()">Подтвердить</button>
+                </div>
+                <div style="margin-top: 15px; text-align: center;">
+                    <button type="button" id="resend-reset-code-btn" class="auth-btn secondary-btn" onclick="shop.resendResetCode()" style="font-size: 14px; padding: 8px 16px;">
+                        Отправить код заново
                     </button>
                 </div>
-                <button type="button" class="auth-btn secondary-btn" onclick="shop.backToSelectAccount()" style="margin-top: 10px;">Назад</button>
             </div>
 
             <!-- Форма смены пароля -->

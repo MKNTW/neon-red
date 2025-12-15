@@ -3,6 +3,12 @@
 /* Подключение шрифта - должно быть в начале файла */
 @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800;900&display=swap');
 
+/* Preload критических ресурсов */
+@font-face {
+    font-family: 'Exo 2';
+    font-display: swap;
+}
+
 * { 
     margin: 0; 
     padding: 0; 
@@ -779,6 +785,31 @@ button:focus-visible {
     color: var(--text-secondary);
     font-size: 0.85rem;
     margin-top: 5px;
+}
+
+.password-strength-indicator {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.password-strength-indicator > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.password-strength-indicator > div > div {
+    flex: 1;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.password-strength-indicator > div > div > div {
+    height: 100%;
+    transition: width 0.3s ease, background-color 0.3s ease;
 }
 
 .step-buttons {
