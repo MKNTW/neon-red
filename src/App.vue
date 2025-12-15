@@ -68,8 +68,6 @@ const showProfileModal = ref(false)
 const showAdminModal = ref(false)
 const showForgotPasswordModal = ref(false)
 
-const { syncCart } = useCart()
-
 onMounted(async () => {
   await validateToken()
   await loadProducts(1, false)
