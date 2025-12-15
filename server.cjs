@@ -21,19 +21,64 @@ const upload = multer({ storage });
 // Middleware
 // Сжатие ответов для улучшения производительности
 app.use(compression());
-app.use(cors({
-    origin: [
-        'https://shop.mkntw.xyz',
-        'https://apiforshop.mkntw.xyz',
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:3001'
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// CORS настройки - разрешаем запросы с Vercel и других доменов
+const allowedOrigins = [
+    'https://shop.mkntw.xyz',
+    'https://apiforshop.mkntw.xyz',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001'
+];
+
+// Добавляем Vercel домены из переменных окружения
+if (process.env.VERCEL_URL) {
+    allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+}
+if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
+// Разрешаем все Vercel домены (для удобства разработки)
+// В production лучше указать конкретные домены
+if (process.env.NODE_ENV === 'production') {
+    // Разрешаем все поддомены vercel.app
+    app.use(cors({
+        origin: function (origin, callback) {
+            // Разрешаем запросы без origin (мобильные приложения, Postman и т.д.)
+            if (!origin) return callback(null, true);
+            
+            // Проверяем явно разрешенные домены
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+            
+            // Разрешаем все Vercel домены
+            if (origin.endsWith('.vercel.app') || origin.endsWith('.vercel.app/')) {
+                return callback(null, true);
+            }
+            
+            // Разрешаем локальные домены для разработки
+            if (process.env.NODE_ENV !== 'production' && 
+                (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+                return callback(null, true);
+            }
+            
+            callback(new Error('Not allowed by CORS'));
+        },
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization']
+    }));
+} else {
+    // В разработке разрешаем все
+    app.use(cors({
+        origin: true,
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization']
+    }));
+}
 app.use(express.json());
 
 // Supabase клиент

@@ -116,6 +116,15 @@ npm run preview
 VITE_API_URL=http://your-backend-url/api/v1
 ```
 
+### 🌐 Деплой на Vercel + Render.com
+
+Для деплоя на Vercel (frontend) и Render.com (backend) см. подробные инструкции в файле [`VERCEL-DEPLOY.md`](./VERCEL-DEPLOY.md).
+
+**Кратко:**
+1. На Render.com создайте Web Service и запустите backend (`npm start`)
+2. В Vercel добавьте переменную окружения: `VITE_API_URL=https://your-backend.onrender.com/api/v1`
+3. Пересоберите проект на Vercel
+
 ## 🔑 Основные компоненты
 
 ### Композаблы
