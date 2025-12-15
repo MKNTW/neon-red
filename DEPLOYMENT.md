@@ -26,7 +26,7 @@ Backend файл переименован в `server.cjs` для использ�
 1. **Build Command**: `npm run build`
 2. **Start Command**: `npm run preview` (или настройте статический хостинг)
 3. **Environment Variables**:
-   - `VITE_API_URL` - URL вашего backend API (например: `https://your-backend.onrender.com/api/v1`)
+   - `VITE_API_URL` - URL вашего backend API (например: `https://your-backend.onrender.com/api`)
 
 ## Локальный запуск
 

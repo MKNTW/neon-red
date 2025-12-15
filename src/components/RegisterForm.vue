@@ -438,15 +438,98 @@ async function handleSubmit() {
 </script>
 
 <style scoped>
+.register-form-steps {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
 .register-step {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-group label {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: all 0.3s;
+  font-family: inherit;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: var(--neon-red);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 20px rgba(255, 0, 51, 0.2);
+}
+
+.input-group input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .step-buttons {
   display: flex;
   gap: 12px;
+  margin-top: 8px;
+}
+
+.step-buttons .auth-btn {
+  flex: 1;
+  padding: 14px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.3s;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, var(--neon-red), var(--neon-pink));
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 0, 51, 0.3);
+}
+
+.primary-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 0, 51, 0.4);
+}
+
+.primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .secondary-btn {
@@ -458,43 +541,106 @@ async function handleSubmit() {
 .secondary-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.15);
   border-color: var(--neon-red);
+  box-shadow: 0 0 15px rgba(255, 0, 51, 0.2);
 }
 
 .skip-btn {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
+  border: 2px solid transparent;
+}
+
+.skip-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 .verification-hint {
   color: var(--text-secondary);
   font-size: 0.9rem;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: rgba(255, 0, 51, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid var(--neon-red);
 }
 
 .verification-hint strong {
   color: var(--neon-red);
+  font-weight: 700;
 }
 
 .input-error {
   color: var(--neon-red);
   font-size: 0.85rem;
-  margin-top: 5px;
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 0, 51, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid var(--neon-red);
+  animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
 }
 
 .password-hint {
   color: var(--text-secondary);
   font-size: 0.85rem;
-  margin-top: 5px;
+  margin-top: 6px;
+  font-style: italic;
 }
 
 .resend-container {
   text-align: center;
-  margin-top: 15px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
 }
 
 .resend-btn {
   font-size: 0.9rem;
-  padding: 8px 16px;
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-color);
+}
+
+.resend-btn:hover:not(:disabled) {
+  color: var(--neon-red);
+  border-color: var(--neon-red);
+  background: rgba(255, 0, 51, 0.05);
+}
+
+.resend-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auth-switch {
+  margin-top: 24px;
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.auth-switch p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.auth-switch a {
+  color: var(--neon-red);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.auth-switch a:hover {
+  text-shadow: 0 0 10px rgba(255, 0, 51, 0.5);
 }
 </style>
 

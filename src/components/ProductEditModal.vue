@@ -227,14 +227,14 @@ async function handleSubmit() {
     
     if (props.product) {
       // Обновление существующего товара
-      await request(`/products/${props.product.id}`, {
+      await request(`/admin/products/${props.product.id}`, {
         method: 'PUT',
         body: JSON.stringify(productData)
       })
       showToast('Товар обновлен', 'success')
     } else {
       // Создание нового товара
-      await request('/products', {
+      await request('/admin/products', {
         method: 'POST',
         body: JSON.stringify(productData)
       })

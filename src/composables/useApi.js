@@ -10,34 +10,16 @@ function getApiBaseUrl() {
   
   // Приоритет 2: Автоматическое определение для production
   if (import.meta.env.PROD) {
-    // В production без переменной окружения показываем предупреждение
-    console.error(
-      '⚠️ VITE_API_URL не установлена!\n' +
-      'Укажите URL backend сервера в переменных окружения Vercel:\n' +
-      'VITE_API_URL=https://your-backend.onrender.com/api/v1\n' +
-      'Текущий hostname:', window.location.hostname
-    )
-    // Пытаемся определить по hostname (для Vercel preview deployments)
-    const hostname = window.location.hostname
-    if (hostname.includes('vercel.app')) {
-      // Для Vercel preview можно использовать относительный путь или определить backend
-      console.warn('Используется Vercel, но VITE_API_URL не установлена. Запросы не будут работать.')
-    }
-    // Возвращаем пустую строку, чтобы запросы явно провалились
+    // В production без переменной окружения возвращаем пустую строку
+    // Технические ошибки не показываем пользователю
     return ''
   }
   
   // Для разработки используем localhost
-  return 'http://localhost:3001/api/v1'
+  return 'http://localhost:3001/api'
 }
 
 const API_BASE_URL = getApiBaseUrl()
-
-// Предупреждение в консоли, если URL не настроен
-if (import.meta.env.PROD && !API_BASE_URL) {
-  console.error('❌ API URL не настроен! Запросы к серверу не будут работать.')
-  console.error('Добавьте переменную окружения VITE_API_URL в настройках Vercel')
-}
 const FETCH_TIMEOUT_MS = 60 * 1000
 const MAX_RETRIES = 3
 const RETRY_DELAY_MS = 1000

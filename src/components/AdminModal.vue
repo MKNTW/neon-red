@@ -94,7 +94,7 @@ import ProductEditModal from './ProductEditModal.vue'
 import { useApi } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 
-defineProps({
+const props = defineProps({
   modelValue: {
     type: Boolean,
     default: false
@@ -134,7 +134,7 @@ async function loadProducts() {
     const data = await request('/products?page=1&limit=100')
     adminProducts.value = data.products || data || []
   } catch (error) {
-    console.error('Error loading products:', error)
+    // Ошибка загрузки товаров обработана в showToast
     showToast('Ошибка загрузки товаров', 'error')
   } finally {
     loading.value = false
@@ -152,7 +152,7 @@ async function deleteProduct(productId) {
   }
   
   try {
-    await request(`/products/${productId}`, { method: 'DELETE' })
+    await request(`/admin/products/${productId}`, { method: 'DELETE' })
     showToast('Товар удален', 'success')
     await loadProducts()
   } catch (error) {

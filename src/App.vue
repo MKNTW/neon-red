@@ -9,7 +9,6 @@
       @open-auth="showAuthModal = true"
       @open-cart="showCartModal = true"
       @open-admin="showAdminModal = true"
-      @load-products="loadProducts"
     />
 
     <ProductList

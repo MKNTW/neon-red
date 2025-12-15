@@ -177,7 +177,7 @@ async function loadOrders() {
     const data = await request('/orders')
     orders.value = Array.isArray(data) ? data : []
   } catch (error) {
-    console.error('Error loading orders:', error)
+    // Ошибка загрузки заказов обработана в showToast
   }
 }
 
@@ -207,7 +207,8 @@ async function saveField(value, confirmValue) {
     
     const serverField = fieldMap[field]
     if (!serverField) {
-      throw new Error('Неизвестное поле для обновления')
+      showToast('Неизвестное поле для обновления', 'error')
+      return
     }
     
     // Проверка на изменение значения

@@ -2027,6 +2027,58 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
+// Получить один товар по ID (публичный доступ)
+app.get('/api/products/:id', async (req, res) => {
+    try {
+        const productId = parseInt(req.params.id);
+        if (isNaN(productId)) {
+            return res.status(400).json({ error: 'Неверный ID товара' });
+        }
+        
+        const { data: product, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', productId)
+            .single();
+            
+        if (error) {
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({ error: 'Товар не найден' });
+            }
+            throw error;
+        }
+        
+        // Обработка изображения
+        const supabaseUrl = process.env.SUPABASE_URL || 'https://peoudeeodcorbigjkxmd.supabase.co';
+        let imageUrl = null;
+        
+        if (product.image_url && product.image_url.trim() !== '' && product.image_url.trim().startsWith('http')) {
+            imageUrl = product.image_url.trim();
+        } else if (product.image_path && product.image_path.trim() !== '') {
+            let cleanPath = product.image_path.trim();
+            if (cleanPath.startsWith('/')) cleanPath = cleanPath.substring(1);
+            
+            if (cleanPath.includes('storage/v1/object/public/')) {
+                const match = cleanPath.match(/storage\/v1\/object\/public\/[^\/]+\/(.+)$/);
+                if (match) cleanPath = match[1];
+            }
+            if (!cleanPath.startsWith('products/') && !cleanPath.startsWith('avatars/')) {
+                cleanPath = `products/${cleanPath}`;
+            }
+            imageUrl = `${supabaseUrl}/storage/v1/object/public/product-images/${cleanPath}`;
+        }
+        
+        res.json({
+            ...product,
+            image_url: imageUrl
+        });
+        
+    } catch (error) {
+        console.error('Get product error:', error);
+        res.status(500).json({ error: 'Ошибка загрузки товара' });
+    }
+});
+
 // Получить товары для админа
 app.get('/api/admin/products', authenticateToken, authenticateAdmin, async (req, res) => {
     try {

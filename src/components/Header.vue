@@ -55,13 +55,6 @@
           <span class="btn-text">Админ-панель</span>
         </button>
       </div>
-      <div class="nav-container">
-        <nav class="desktop-nav" role="navigation" aria-label="Основная навигация">
-          <a href="#" @click.prevent="$emit('load-products')" aria-label="Показать все товары">
-            Все товары
-          </a>
-        </nav>
-      </div>
     </div>
   </header>
 </template>
@@ -71,7 +64,7 @@ import { ref, watch } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { useCart } from '../composables/useCart'
 
-defineEmits(['open-profile', 'open-auth', 'open-cart', 'open-admin', 'load-products'])
+defineEmits(['open-profile', 'open-auth', 'open-cart', 'open-admin'])
 
 const { isAuthenticated, isAdmin } = useAuth()
 const { cartItemsCount } = useCart()
@@ -177,27 +170,6 @@ header {
 
 .header-admin {
   margin-bottom: 15px;
-}
-
-.nav-container {
-  border-top: 1px solid var(--border-color);
-  padding-top: 15px;
-}
-
-.desktop-nav {
-  display: flex;
-  gap: 20px;
-}
-
-.desktop-nav a {
-  color: var(--text-secondary);
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.3s;
-}
-
-.desktop-nav a:hover {
-  color: var(--neon-red);
 }
 </style>
 

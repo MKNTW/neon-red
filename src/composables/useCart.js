@@ -30,7 +30,7 @@ export function useCart() {
     try {
       localStorage.setItem('cart', JSON.stringify(cart.value))
     } catch (e) {
-      console.error('Error saving cart:', e)
+      // Ошибка сохранения корзины в localStorage (не критично)
       showToast('Ошибка сохранения корзины', 'error')
     }
   }
@@ -41,7 +41,7 @@ export function useCart() {
       const data = await request(`/products/${productId}`)
       return data.quantity || 0
     } catch (error) {
-      console.warn('Failed to sync product quantity:', error)
+      // Технические ошибки не показываем пользователю
       return null
     }
   }
@@ -159,7 +159,7 @@ export function useCart() {
         saveCart()
       }
     } catch (error) {
-      console.warn('Cart sync error:', error)
+      // Технические ошибки синхронизации не показываем пользователю
     }
   }
 
