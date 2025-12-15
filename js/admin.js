@@ -508,6 +508,16 @@ export class AdminModule {
             showToast('Товар создан', 'success');
 
             this.closeAddProductModal();
+            
+            // Очищаем кэш товаров перед обновлением
+            try {
+                localStorage.removeItem('products_cache');
+                localStorage.removeItem('products_cache_timestamp');
+            } catch (e) {
+                console.warn('Cache clear error:', e);
+            }
+            
+            // Обновляем списки
             await this.loadAdminProducts();
             // Обновляем список товаров с первой страницы без кэша
             await this.shop.productsModule.loadProducts(1, false);
